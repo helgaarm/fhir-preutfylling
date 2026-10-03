@@ -6,7 +6,7 @@ Appen støtter den anonyme DHG–FHIR-testfasaden i vedlagte `DHG_FHIR_API_Utvik
 
 Repoeieren bekreftet 4. oktober 2026 nødvendige rettigheter eller tillatelser til referansekoden og DHG-eksemplene. [Opprinnelsesoversikten](PROVENANCE.md) registrerer bekreftelsen og hvilke filer den gjelder. Original DOCX, Swagger-uttrekk og rå API-svar distribueres ikke. MIT-lisensen på klientkoden gir ingen selvstendig rett til tjenestetilgang eller eksterne data.
 
-Eksemplene bruker LOINC, UCUM, HL7-koder og SNOMED CT `738070007`. Se [tredjepartsmerknadene](../THIRD-PARTY-NOTICES.md) og [eksempellisensene](../examples/README.md). Bruk og videreformidling av SNOMED CT må ha relevant lisensgrunnlag; den medfølgende merknaden er ikke en lisensavtale.
+Se [eksempeloversikten](../examples/README.md) for formålet med de medfølgende JSON-filene.
 
 ## Prøv i appen
 

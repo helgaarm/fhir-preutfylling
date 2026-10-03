@@ -236,9 +236,9 @@ Bygg, selvtester, HTTP- og nettleserflyt er kontrollert. DHG Test er også verif
 
 ## Lisens og sikkerhet i det offentlige repoet
 
-Prosjektets egen kode og dokumentasjon er utgitt under [MIT-lisensen](LICENSE), copyright 2026 Armann Helgason. Behold lisens- og copyrightteksten ved videreformidling. De låste NuGet-pakkene er under MIT/BSD-3-Clause og beholder sine egne merknader. LOINC, UCUM og SNOMED CT i eksemplene har egne vilkår; MIT gir ingen terminologilisens, garanti eller klinisk godkjenning.
+Prosjektets egen kode og dokumentasjon er utgitt under [MIT-lisensen](LICENSE), copyright 2026 Armann Helgason. Behold lisens- og copyrightteksten ved videreformidling. De låste NuGet-pakkene er under MIT/BSD-3-Clause og beholder sine egne merknader.
 
-[Tredjepartsmerknadene](THIRD-PARTY-NOTICES.md), [lisensgjennomgangen](docs/LICENSE_REVIEW.md) og [opprinnelsesoversikten](docs/PROVENANCE.md) beskriver kravene, eierens rettighetsbekreftelse og gjenstående bruksspesifikke avklaringer. SNOMED CT-bruk og videreformidling må ha relevant lisensgrunnlag. Originale lisenstekster ligger i [LICENSES/](LICENSES/); de følger normal build/publish og kan leses via **Lisenser** i appens bunntekst. Behold disse filene når appen pakkes videre.
+[Tredjepartsmerknadene](THIRD-PARTY-NOTICES.md), [lisensgjennomgangen](docs/LICENSE_REVIEW.md) og [opprinnelsesoversikten](docs/PROVENANCE.md) beskriver biblioteklisensene og eierens rettighetsbekreftelse. Originale lisenstekster ligger i [LICENSES/](LICENSES/); de følger normal build/publish og kan leses via **Lisenser** i appens bunntekst. Behold disse filene når appen pakkes videre.
 
 Kontroller lisensoversikten med `python scripts/check-licenses.py` etter restore, og med `python scripts/check-licenses.py --publish-dir publish` etter publisering. CI kjører begge kontrollene. Ved nye pakker eller versjoner må lisensoversikten oppdateres etter manuell vurdering.
 

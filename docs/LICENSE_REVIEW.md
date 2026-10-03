@@ -4,7 +4,7 @@
 
 ## Konklusjon og funn
 
-Prosjektets egen kode kan fortsatt være MIT-lisensiert. De **11 låste NuGet-pakkene** oppgir **BSD-3-Clause for fire pakker** og **MIT for sju pakker**. Disse tillater kombinasjonen som brukes her når copyright, lisenstekster og påkrevde merknader beholdes. Ingen av de 11 pakkenes deklarerte hovedlisenser krever at appens egen kildekode publiseres. Dette er ikke en konklusjon om at kodeverk, hele .NET-distribusjonen eller utviklingsverktøy er MIT-lisensiert.
+Prosjektets egen kode kan fortsatt være MIT-lisensiert. De **11 låste NuGet-pakkene** oppgir **BSD-3-Clause for fire pakker** og **MIT for sju pakker**. Disse tillater kombinasjonen som brukes her når copyright, lisenstekster og påkrevde merknader beholdes. Ingen av de 11 pakkenes deklarerte hovedlisenser krever at appens egen kildekode publiseres. Dette er ikke en konklusjon om at hele .NET-distribusjonen eller utviklingsverktøy er MIT-lisensiert.
 
 | Funn ved gjennomgang | Tiltak/status |
 | --- | --- |
@@ -12,8 +12,6 @@ Prosjektets egen kode kan fortsatt være MIT-lisensiert. De **11 låste NuGet-pa
 | `dotnet publish` inkluderte bare prosjektets egen lisens | Prosjektfilen inkluderer nå tredjepartsmerknader, hele `LICENSES/`, denne rapporten, opprinnelse og eksempelmerknader. |
 | Firely-pakkene oppga SPDX-uttrykk, men hadde ikke med en separat lisensfil i den undersøkte pakken | Hentet originale tekster fra nøyaktig repository-commit i `.nuspec`. Opphavsnavn og original ordlyd er beholdt. |
 | Microsoft-pakkene leverte to forskjellige varianter av `THIRD-PARTY-NOTICES.TXT` | Begge er tatt med. Options 8.0.2 har varianten kalt 8.0.0 her; mappe-/versjonsnavn alene brukes ikke til å velge tekst. |
-| LOINC-/UCUM-koder manglet samlet attribusjon | Merknader, offisielle kodenavn og lenker er lagt til. LOINC-merknaden følger også i filen med navnet som vilkårene angir. |
-| DHG-eksemplet refererer til SNOMED CT | Dokumentert som separat lisensområde. Det er ikke registrert en SNOMED Affiliate-avtale eller en spesifikk tillatelse til offentlig videreformidling i denne gjennomgangen. Merknaden er ingen underlisens. |
 | Referansekode og DHG-eksempler manglet registrert rettighetsgrunnlag | Eieren bekreftet nødvendige rettigheter/tillatelser 4. oktober 2026. Se [opprinnelse](PROVENANCE.md). |
 | Ingen kontroll hindret lisensoversikten i å bli utdatert | Ny lokal kontroll og CI-steg avviser endret pakkeliste, versjon, hash, metadata, merknadstekst eller manglende publiserte dokumenter. |
 
@@ -25,7 +23,7 @@ Dette er en teknisk lisens- og dokumentasjonsgjennomgang med kildespor. Den fast
 - Originale lisens- og merknadsfiler i NuGet-cachen. Firely-tekstene er hentet fra kilderevisjonene nedenfor.
 - JSON-eksempler, søkeuttrykk, kildereferanser, CSS, SVG, skjermbilder, testskript, VS Code-anbefalinger og CI-verktøy.
 - Eierens rettighetsbekreftelse og det allerede tilgjengelige tekstuttrekket fra DHG-veiledningen. Den undersøkte Swagger-metadataen har ikke noe lisensfelt; anonym tilgang er derfor ikke behandlet som en publiseringslisens.
-- Offisielle nettsider for kodeverk og verktøy, lest på gjennomgangsdatoen. Det er ikke gjort nye pasientoppslag for lisensarbeidet.
+- Offisielle nettsider for verktøy, lest på gjennomgangsdatoen. Det er ikke gjort nye pasientoppslag for lisensarbeidet.
 
 ## NuGet-avhengigheter og plikter
 
@@ -39,24 +37,6 @@ Den lesbare pakkelisten står i [tredjepartsmerknadene](../THIRD-PARTY-NOTICES.m
 Firely SDK 6.6.0 er kontrollert mot [commit da98b807e006afa1b8ee9ae449932935fb835c23](https://github.com/FirelyTeam/firely-net-sdk/blob/da98b807e006afa1b8ee9ae449932935fb835c23/LICENSE). Metrics 1.4.0 er kontrollert mot [commit b95488943b6cfccb2b24470fb8da4407c9f03537](https://github.com/FirelyTeam/Fhir.Metrics/blob/b95488943b6cfccb2b24470fb8da4407c9f03537/LICENSE). Ingen krav om kommersiell Firely-produktlisens ble identifisert for disse konkrete SDK-pakkene. Andre Firely-produkter inngår ikke i denne vurderingen.
 
 Copyright-år i `.nuspec` og i selve lisensfilen kan være ulike, for eksempel for Metrics og Newtonsoft.Json. Ingen årstall eller navn er «rettet» til prosjektets navn. Microsofts brede tredjepartsmerknader er beholdt som levert; dette er ikke en påstand om at alle omtalte biblioteker følger appen.
-
-## Kodeverk og standarder
-
-| Materiale i repoet | Vurdering og dokumentasjon |
-| --- | --- |
-| FHIR R4 4.0.1 og SDC-referanser | FHIR-spesifikasjonen oppgir CC0, med særskilte varemerke- og tredjepartsforbehold. Appen implementerer en avgrenset kontrakt og bruker canonical-URL-er; ingen komplett spesifikasjon er kopiert inn. Dette dokumenterer ikke full FHIR/SDC-konformitet. [HL7s lisensside](https://hl7.org/fhir/R4/license.html). |
-| LOINC: fire koder | Egen terminologilisens, ikke MIT. Påkrevd kortmerknad er tatt med. Koder er koblet til offisielle Long Common Names i oversikten; ingen eksterne spørreskjemainstrumenter eller LOINC-tabell er kopiert inn. [Gjeldende vilkår](https://loinc.org/license), særlig punkt 8–10 og reglene om tredjepartsinnhold. |
-| UCUM: `d`, `mm[Hg]` | UCUM License 1.1 fra juni 2024 har egne betingelser, blant annet begrensninger på endring av standarden. Merknad og lenke til ansvarsfraskrivelsen følger med. Norske enhetsetiketter endrer ikke enhetskodene. [Vilkår](https://ucum.org/license). |
-| SNOMED CT: `738070007` | Inngår i DHG-fixture og filteruttrykk. Ingen full release eller database medfølger. Bruk og videreformidling må vurderes under relevant SNOMED-lisens; MIT på appen og eierens bekreftelse for DHG-materialet erstatter ikke dette. [SNOMED International](https://www.snomed.org/get-snomed). |
-| HL7 `v3-ActCode|AMB` og andre standardkoder/URL-er | Referanser i FHIR-eksempler, ikke distribusjon av hele HL7-terminologipakken. Behold standardidentifikatorer og kontroller vilkår ved kopiering av flere definisjoner eller eksternt terminologiinnhold. [HL7 Terminology](https://terminology.hl7.org/license.html). |
-
-LOINC-vilkårene åpner for koder i kliniske elektroniske meldinger uten en lisensmerknad i hver melding. Programvare og dokumentasjon som inkluderer LOINC-utdrag har egne krav til merknader. Derfor er merknaden lagt i repo, publiseringsfiler og appens lisensvisning; den er ikke satt inn som et ikke-standardisert felt i hver FHIR-ressurs.
-
-Helsedirektoratet opplyser at bruk av SNOMED CT i Norge krever lisens, og at denne er gratis. Dette er et konkret oppfølgingspunkt for den som bruker eller distribuerer DHG-eksemplet: dokumenter avtalen og at den aktuelle videreformidlingen er dekket. Ikke anta at et offentlig GitHub-repo, én kode eller et syntetisk datasett automatisk er unntatt. [Norsk veiledning](https://www.helsedirektoratet.no/digitalisering-og-e-helse/helsefaglige-kodeverk/snomed-ct/hvordan-ta-i-bruk-snomed-ct).
-
-Eksemplene oppgir ikke en komplett LOINC-/SNOMED-/UCUM-utgave og er ikke en validert terminologirelease. Nye kodeutdrag og gjenbruk av større tabeller, definisjoner eller spørreskjemaer krever en egen gjennomgang av utgave og eventuelle ytterligere rettighetshavere.
-
-SDCs undersøkte [oppstrømskonfigurasjon](https://github.com/HL7/sdc/blob/master/sushi-config.yaml) angir `CC0-1.0`. Den lenken følger utviklingsgrenen og er ikke brukt som bevis for en bestemt låst, distribuert SDC-pakke; appen distribuerer ingen slik pakke.
 
 ## Frontend, test- og utviklingsverktøy
 
@@ -79,9 +59,9 @@ Verktøyene nedenfor brukes under utvikling/CI og distribueres ikke gjennom appe
 
 ## Hva som skal følge en distribusjon
 
-1. Behold rotens `LICENSE`, `THIRD-PARTY-NOTICES.md` og hele `LICENSES/`, inkludert `LOINC_short_license.txt` og inventaret.
+1. Behold rotens `LICENSE`, `THIRD-PARTY-NOTICES.md` og hele `LICENSES/`, inkludert inventaret.
 2. Ta med `docs/LICENSE_REVIEW.md`, `docs/PROVENANCE.md` og `examples/README.md` når appens eksempler medfølger. Prosjektfilen gjør dette for normal build/publish.
-3. Ved nettbasert nedlasting: gjør tredjeparts- og LOINC-merknadene tilgjengelige fra nedlastingssiden. I en kjørende app er de tilgjengelige via **Lisenser** (`/licenses`).
+3. Ved nettbasert nedlasting: gjør tredjepartsmerknadene tilgjengelige fra nedlastingssiden. I en kjørende app er de tilgjengelige via **Lisenser** (`/licenses`).
 4. Ved `--self-contained`, andre runtime-versjoner/RID-er, single-file, trimming, Native AOT eller container: gjennomgå de faktiske ekstra komponentene og deres tekster. Denne rapporten er ingen komplett lisensklarering for slike artefakter. Også lisensfiler må distribueres når applikasjonen ellers består av én binærfil.
 5. Ikke inkluder `output/`, virtuelle Python-miljøer, rå API-svar, DOCX eller lokale hemmeligheter i manuelle arkiver.
 
@@ -89,7 +69,7 @@ Standardpubliseringen er avhengig av en separat installert ASP.NET Core-runtime.
 
 ## Vedlikehold og lokal kontroll
 
-Etter en endring av NuGet-pakker skal utvikleren kontrollere original lisens, opphav og merknader for **alle endrede direkte og transitive pakker**, oppdatere låsefil og `LICENSES/inventory.json`, erstatte relevante tekster og oppdatere tabellene. Nye pakker blir ikke automatisk godkjent fordi SPDX-uttrykket er MIT eller BSD. Innholdsendring i kodeverk og nye assets krever separat manuell vurdering; NuGet-kontrollen oppdager ikke slikt.
+Etter en endring av NuGet-pakker skal utvikleren kontrollere original lisens, opphav og merknader for **alle endrede direkte og transitive pakker**, oppdatere låsefil og `LICENSES/inventory.json`, erstatte relevante tekster og oppdatere tabellene. Nye pakker blir ikke automatisk godkjent fordi SPDX-uttrykket er MIT eller BSD. Nye assets krever separat manuell vurdering; NuGet-kontrollen oppdager ikke slikt.
 
 ```sh
 dotnet restore --locked-mode
@@ -102,10 +82,10 @@ python scripts/check-licenses.py --publish-dir publish
 
 Kontrollen bruker standardbiblioteket i Python og ingen nettverk. Den sammenligner også kopierte pakkemerknader med originalene i lokal NuGet-cache. Hashene for tekst beregnes etter UTF-8-dekoding uten BOM og normalisering av linjeskift til LF, slik at Git på Windows/Linux gir samme resultat. Øvrig innhold, inkludert mellomrom, beholdes.
 
-CI kjører kontrollen etter restore og etter publish, i tillegg til regresjoner for kontrollen. Dette dokumenterer konsistens og at lisensfilene følger med; det er ikke automatisk juridisk godkjenning av ukjente rettigheter, nye terminologiutdrag eller nedlastede verktøy.
+CI kjører kontrollen etter restore og etter publish, i tillegg til regresjoner for kontrollen. Dette dokumenterer konsistens og at lisensfilene følger med; det er ikke automatisk juridisk godkjenning av ukjente rettigheter eller nedlastede verktøy.
 
 ## Utført verifikasjon
 
 Lokal lisenskontroll og kontroll av publiserte dokumenter bestod for alle 11 NuGet-pakker. Seks regresjoner av selve kontrollen bestod. Release-bygg hadde ingen advarsler eller feil; 44 C#-tester, 24 generiske HTTP-kontroller og 24 DHG-kontroller mot lokal testdobbel bestod. Nettlesertestene bestod på desktop og mobil uten JavaScript-feil. CI-filen er kontrollert med actionlint 1.7.12. Lisensarbeidet brukte ingen eksterne FHIR-kall.
 
-Arbeidskopien er kontrollert lokalt; endringene er ikke sendt til GitHub og en ny GitHub Actions-kjøring er ikke utført. Den eksisterende MIT-lisensen er uendret. `verification/RESULTATER.md` i kildekoderepoet inneholder kontrollene og avgrensningene; den filen er ikke en del av appens publiserte lisenspakke.
+Den eksisterende MIT-lisensen er uendret. `verification/RESULTATER.md` i kildekoderepoet inneholder kontrollene og avgrensningene; den filen er ikke en del av appens publiserte lisenspakke.

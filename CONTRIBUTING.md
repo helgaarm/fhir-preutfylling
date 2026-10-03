@@ -20,4 +20,4 @@ Nye Actions skal bruke hele 40-tegns commit-ID-er med versjonskommentar. Workflo
 
 Ved mistanke om en sårbarhet: følg [SECURITY.md](SECURITY.md), ikke opprett en offentlig feilrapport med detaljer. Les [MIT-lisensen](LICENSE); bidrag leveres under samme lisens, og tredjepartskode må ha kompatible vilkår og beholde påkrevde merknader.
 
-Bidra bare med materiale du har rett til å publisere under de oppgitte vilkårene, også når arbeidsgiver eller andre eier rettigheter. Dokumenter kilde og tillatelse for importert kode, tekst, grafikk og eksempler i [opprinnelsesoversikten](docs/PROVENANCE.md). Ikke merk tredjepartskodeverk som MIT: LOINC, UCUM, SNOMED CT og eksterne spørreskjemaer krever separat vurdering. Ingen CLA eller overføring av eierskap er innført med denne dokumentasjonen.
+Bidra bare med materiale du har rett til å publisere under de oppgitte vilkårene, også når arbeidsgiver eller andre eier rettigheter. Dokumenter kilde og tillatelse for importert kode, tekst, grafikk og eksempler i [opprinnelsesoversikten](docs/PROVENANCE.md). Ingen CLA eller overføring av eierskap er innført med denne dokumentasjonen.
