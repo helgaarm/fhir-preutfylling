@@ -14,6 +14,10 @@ concurrency:
 jobs:
   review:
     name: Dependency review
+    # The owner must enable Dependency Graph first; CI's NuGet audit is always active.
+    # Keep this job visibly skipped until the platform feature is available, rather
+    # than reporting a successful dependency review that never happened.
+    if: vars.DEPENDENCY_REVIEW_ENABLED == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:

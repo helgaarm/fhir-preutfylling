@@ -25,7 +25,7 @@ Dette er en lokal testapp for betrodde Questionnaire-definisjoner og syntetiske 
 
 - CI bygger med låste NuGet-avhengigheter, avviser audit-advarsler og kjører C#- og HTTP-testene.
 - CodeQL analyserer C# og JavaScript. Gitleaks skanner Git-historikken; funn redigeres bort fra loggene.
-- Dependency Review kontrollerer nye avhengigheter i PR-er. Dependabot foreslår ukentlige NuGet- og Actions-oppdateringer; de flettes ikke automatisk.
+- Dependency Review er klargjort for PR-er, men krever at eieren aktiverer Dependency Graph og setter `DEPENDENCY_REVIEW_ENABLED=true`; inntil da er jobben synlig hoppet over. NuGet-auditen i CI kjører uavhengig av dette. Dependabot-konfigurasjonen foreslår ukentlige NuGet- og Actions-oppdateringer når GitHub-funksjonen er tilgjengelig; de flettes ikke automatisk.
 - Actions er låst til hele commit-ID-er. CI har lesetilgang; CodeQL får bare den ekstra skrivetilgangen det trenger til sikkerhetsresultater. Fork-PR-er kjører uten repo-hemmeligheter og bruker ikke `pull_request_target`.
 
 Workflowene erstatter ikke aktivering av GitHubs egne innstillinger. Status og oppsett for varsler, push-beskyttelse, privat rapportering og grenvern beskrives i [docs/GITHUB_SECURITY.md](docs/GITHUB_SECURITY.md). Ingen skanner garanterer at alle sårbarheter eller personopplysninger blir funnet.

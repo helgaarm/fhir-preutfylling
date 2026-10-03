@@ -58,6 +58,7 @@ jobs:
               echo 'The synthetic test server stopped during startup.'
               exit 1
             fi
+            printf 'Waiting for local test server (%s/30)\n' "$attempt"
             sleep 1
           done
           if [ "$ready" != true ]; then

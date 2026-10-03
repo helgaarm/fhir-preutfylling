@@ -9,7 +9,7 @@ Repoet skal være offentlig. MIT-lisensen gjelder prosjektets egen kode og dokum
 | Reproduserbare avhengigheter | `packages.lock.json`, `dotnet restore --locked-mode` i CI |
 | Sårbare avhengigheter | NuGet audit av alle direkte/transitive pakker; audit-advarsler feiler restore |
 | Tester | Release-bygg, 27 C#-selvtester og HTTP-tester mot publisert app |
-| Endring av avhengigheter | Dependency Review i PR-er, feil ved nye kjente sårbarheter fra lav alvorlighet |
+| Endring av avhengigheter | Dependency Review klargjort for PR-er; krever Dependency Graph og eksplisitt aktivering (se nedenfor) |
 | Oppdateringer | Dependabot for NuGet og GitHub Actions hver uke, uten automatisk fletting |
 | Kodeanalyse | CodeQL med `security-extended` for C# og JavaScript, også ukentlig |
 | Hemmeligheter | Gitleaks over Git-historikken med redigerte funn i logger |
@@ -26,7 +26,7 @@ CodeQL-funn må vurderes i Security-fanen; en vellykket analyse betyr at skannin
 
 Disse innstillingene ligger hos GitHub og aktiveres ikke av dokumentasjonen eller workflowfilene alene:
 
-1. **Security → Advanced Security / Code security**: aktiver Dependabot alerts, Dependabot security updates, secret scanning og push protection.
+1. **Settings → Advanced Security / Code security**: aktiver Dependency Graph, Dependabot alerts, Dependabot security updates, secret scanning og push protection.
 2. **Security → Advisories**: aktiver private vulnerability reporting. SECURITY.md beskriver en reservevei dersom skjemaet ikke er tilgjengelig.
 3. **Settings → Actions → General**: velg lesetilgang som standard for `GITHUB_TOKEN`, ikke la Actions godkjenne PR-er, og krev godkjenning av workflowkjøring fra alle eksterne fork-bidragsytere.
 4. **Settings → Branches / Rules**: beskytt `main` med PR-krav, oppdatert gren og vellykkede `Build and test`, `Secret scan` og `Workflow lint`. Blokker force-push/sletting, krev avklarte diskusjoner og lineær historikk. Regelen skal også gjelde administratorer.
@@ -35,6 +35,14 @@ Disse innstillingene ligger hos GitHub og aktiveres ikke av dokumentasjonen elle
 For en repo-eier uten andre vedlikeholdere brukes PR-krav med **0 påkrevde eksterne godkjenninger**, slik at eieren kan flette egne PR-er etter grønne kontroller. CODEOWNERS identifiserer fortsatt eieren. Når en ekstra vedlikeholder er lagt til, aktiver minst én uavhengig godkjenning, kodeeiergodkjenning og godkjenning etter siste push.
 
 Oppsettet bruker **advanced CodeQL workflow**. Ikke aktiver CodeQL default setup samtidig; GitHub kan da avvise resultatopplasting fra den egendefinerte workflowen.
+
+Etter at Dependency Graph er aktivert, sett repository-variabelen `DEPENDENCY_REVIEW_ENABLED` til `true` under **Settings → Secrets and variables → Actions → Variables**. Før aktivering viser GitHub Dependency Review som **skipped**; det er ikke en gjennomført kontroll. NuGet-auditen i `Build and test` er aktiv hele tiden og trenger ikke GitHubs Dependency Graph. Dependabot-kjøringer må også kontrolleres i GitHub etter at funksjonen er slått på.
+
+Med egen `gh`-innlogging kan variabelen settes slik etter at Dependency Graph er aktivert:
+
+```sh
+gh variable set DEPENDENCY_REVIEW_ENABLED --body true --repo helgaarm/fhir-preutfylling
+```
 
 ## Gjennomfør oppsettet
 
