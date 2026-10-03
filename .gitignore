@@ -8,3 +8,12 @@ appsettings.Local.json
 .env.*
 *.log
 __pycache__/
+.vs/
+TestResults/
+coverage/
+*.pfx
+*.p12
+*.pem
+*.key
+secrets.json
+appsettings.*.local.json

@@ -1,5 +1,7 @@
 # FHIR preutfylling — .NET/C# testapp
 
+[MIT-lisens](LICENSE) · [Sikkerhet og privat rapportering](SECURITY.md) · [Bidra](CONTRIBUTING.md)
+
 En lokal fullstack-app som tar **FHIR R4 Questionnaire (Q)** som JSON, henter **Patient og relevante ressurser fra et FHIR-endepunkt**, evaluerer uttrykkene i Q og lager en **QuestionnaireResponse (QR)**. Bygger videre på den vedlagte arkitekturbeskrivelsen og C#-demokoden.
 
 Backend er ASP.NET Core / C# på **.NET 10**, med **Firely Hl7.Fhir.R4 6.6.0**. Frontend er HTML, CSS og JavaScript som serveres av samme app. Du trenger ikke Node, npm, database eller en ekstern FHIR-server for å prøve demoen.
@@ -214,3 +216,11 @@ Dette er en lokal utviklerapp for **syntetiske/testdata og betrodde Q-definisjon
 Grenser: 256 KiB API-request, 240 KiB opplastet Q, 200 items, 12 gruppenivåer, 4 000 tegn per FHIRPath, 20 sider per søk, 2 000 ressurser per søk og 2 MiB per kilderespons. HTTP-kall har 20 sekunders tidsgrense, og en operasjon har 60 sekunders kanselleringsfrist.
 
 Bygg, selvtester, HTTP- og nettleserflyt er kjørt i leveransemiljøet. Se **verification/RESULTATER.md**. Ingen faktisk ekstern klinisk FHIR-kilde var oppgitt; tilkobling til din server og dens tilgangsmodell må verifiseres der. Demoen er ikke produksjonsklar og skriver ikke tilbake til FHIR-kilden.
+
+## Lisens og sikkerhet i det offentlige repoet
+
+Prosjektets kode og dokumentasjon er utgitt under [MIT-lisensen](LICENSE), copyright 2026 Armann Helgason. Du kan bruke, endre og distribuere prosjektet etter lisensvilkårene, og må beholde lisens- og copyrightteksten. Avhengigheter, blant annet Firely SDK, beholder sine egne lisenser. MIT gir ingen garanti eller klinisk godkjenning.
+
+Repoet har konfigurasjon for CI, CodeQL, Gitleaks, Dependency Review og ukentlige Dependabot-oppdateringer. NuGet-avhengigheter er låst i `packages.lock.json`. CI bruker `dotnet restore --locked-mode` og avviser audit-advarsler også for transitive pakker. Actions bruker faste commit-ID-er og minimale tokenrettigheter.
+
+Les [SECURITY.md](SECURITY.md) for privat rapportering. [Sikkerhetsoppsett](docs/GITHUB_SECURITY.md) og [verifisert status](docs/SECURITY_SETUP_STATUS.md) beskriver hvilke GitHub-innstillinger som faktisk er aktivert, og hvilke som eventuelt krever eierens administrasjonstilgang.

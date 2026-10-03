@@ -1,0 +1,6 @@
+# Default maintainer; stricter review requirements can be enabled when a second maintainer joins.
+* @helgaarm
+/.github/ @helgaarm
+/scripts/ @helgaarm
+/SECURITY.md @helgaarm
+/LICENSE @helgaarm
