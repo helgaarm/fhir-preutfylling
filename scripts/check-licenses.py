@@ -2,7 +2,7 @@
 
 Ingen nettverkskall eller automatisk godkjenning av nye lisenser. Sammenligner alle
 låste NuGet-pakker med gjennomgått metadata, originale merknader og eventuell publish-mappe.
-Kodeverk, rettighetserklæringer og verktøyvilkår krever fortsatt manuell gjennomgang.
+Rettighetserklæringer og verktøyvilkår krever fortsatt manuell gjennomgang.
 """
 import argparse
 import hashlib

@@ -266,21 +266,6 @@
       "path": "LICENSES/Dotnet-Runtime-NOTICES-9.0.20.txt",
       "sha256NormalizedUtf8": "fa3e9d0a2c52476f04fe798d7dc4f6e7edb7b68a3d2f4d5f59a39bce957eedc8",
       "source": "https://raw.githubusercontent.com/dotnet/runtime/v9.0.20/THIRD-PARTY-NOTICES.TXT"
-    },
-    {
-      "path": "LICENSES/LOINC_short_license.txt",
-      "sha256NormalizedUtf8": "11d7f9b6086a9e649118177bf41666ecda13fee08c53ffad094a09cec6a7df68",
-      "source": "https://loinc.org/license"
-    },
-    {
-      "path": "LICENSES/UCUM-NOTICE.txt",
-      "sha256NormalizedUtf8": "b0f0f14489b9dc3c9261fc2fdd30376c1611c94657bad08020127fdf56d26249",
-      "source": "https://ucum.org/license"
-    },
-    {
-      "path": "LICENSES/SNOMED-CT-NOTICE.txt",
-      "sha256NormalizedUtf8": "27a5a0bcf69febe9bc94b7a58d7f0b9b4aaa2694ffa787edf16f6252614ca826",
-      "source": "https://www.snomed.org/get-snomed"
     }
   ]
 }

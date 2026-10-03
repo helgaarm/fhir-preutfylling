@@ -2,11 +2,11 @@
 
 ## Lisensgjennomgang
 
-Kontrollert 4. oktober 2026. [Gjennomgangen](../docs/LICENSE_REVIEW.md) dokumenterer lisensgrunnlag og bruksspesifikke avklaringer. Eiers bekreftelse er registrert i [opprinnelsesoversikten](../docs/PROVENANCE.md).
+Kontrollert 4. oktober 2026. [Gjennomgangen](../docs/LICENSE_REVIEW.md) dokumenterer prosjektets og bibliotekenes lisensgrunnlag. Eiers bekreftelse er registrert i [opprinnelsesoversikten](../docs/PROVENANCE.md).
 
 | Kontroll | Resultat |
 | --- | --- |
-| Låsefil, restore-metadata og originale lisensmerknader | 11 av 11 NuGet-pakker kontrollert; 10 medfølgende juridiske tekster |
+| Låsefil, restore-metadata og originale lisensmerknader | 11 av 11 NuGet-pakker kontrollert |
 | Lisenskontrollens regresjoner, inkludert ny pakke, versjon, endret lisens, avkortet tekst og manglende publish-fil | 6 av 6 bestått |
 | Release-bygg med `--warnaserror` og publisering | Bestått, 0 advarsler / 0 feil |
 | Lisensdokumentasjon i publisert app | Alle forventede filer med riktig innhold |
@@ -16,7 +16,7 @@ Kontrollert 4. oktober 2026. [Gjennomgangen](../docs/LICENSE_REVIEW.md) dokument
 | Nettleser, Microsoft Edge via Playwright, desktop og mobil | Bestått; ingen JavaScript-feil eller horisontal overflyt |
 | actionlint 1.7.12, Python-syntaks, lokale dokumentlenker og `git diff --check` | Bestått |
 
-Testene bruker syntetiske data og lokale tjenester. Denne verifikasjonen kontrollerer filer, metadata og funksjon; den bekrefter ikke den enkelte brukers SNOMED CT-avtale eller eksterne tjenestetilgang.
+Testene bruker syntetiske data og lokale tjenester. Denne verifikasjonen kontrollerer filer, metadata og funksjon.
 
 ## DHG-integrasjon
 
