@@ -29,7 +29,7 @@ Disse innstillingene ligger hos GitHub og aktiveres ikke av dokumentasjonen elle
 1. **Settings → Advanced Security / Code security**: aktiver Dependency Graph, Dependabot alerts, Dependabot security updates, secret scanning og push protection.
 2. **Security → Advisories**: aktiver private vulnerability reporting. SECURITY.md beskriver en reservevei dersom skjemaet ikke er tilgjengelig.
 3. **Settings → Actions → General**: velg lesetilgang som standard for `GITHUB_TOKEN`, ikke la Actions godkjenne PR-er, og krev godkjenning av workflowkjøring fra alle eksterne fork-bidragsytere.
-4. **Settings → Branches / Rules**: beskytt `main` med PR-krav, oppdatert gren og vellykkede `Build and test`, `Secret scan` og `Workflow lint`. Blokker force-push/sletting, krev avklarte diskusjoner og lineær historikk. Regelen skal også gjelde administratorer.
+4. **Settings → Branches / Rules**: beskytt `main` med PR-krav, oppdatert gren og vellykkede `Build and test`, `Secret scan`, `Workflow lint`, `CodeQL (csharp)` og `CodeQL (javascript-typescript)`. Blokker force-push/sletting, krev avklarte diskusjoner og lineær historikk. Regelen skal også gjelde administratorer.
 5. Slett ferdig flettede arbeidsgrener automatisk. Behold repoet offentlig.
 
 For en repo-eier uten andre vedlikeholdere brukes PR-krav med **0 påkrevde eksterne godkjenninger**, slik at eieren kan flette egne PR-er etter grønne kontroller. CODEOWNERS identifiserer fortsatt eieren. Når en ekstra vedlikeholder er lagt til, aktiver minst én uavhengig godkjenning, kodeeiergodkjenning og godkjenning etter siste push.

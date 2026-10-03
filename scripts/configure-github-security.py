@@ -10,7 +10,10 @@ import subprocess
 import sys
 
 REPOSITORY = "helgaarm/fhir-preutfylling"
-REQUIRED_CHECKS = ["Build and test", "Secret scan", "Workflow lint"]
+REQUIRED_CHECKS = [
+    "Build and test", "Secret scan", "Workflow lint",
+    "CodeQL (csharp)", "CodeQL (javascript-typescript)",
+]
 
 
 def api(path, method="GET", payload=None):
