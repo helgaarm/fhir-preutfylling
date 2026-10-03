@@ -4,12 +4,17 @@ using QType = Hl7.Fhir.Model.Questionnaire.QuestionnaireItemType;
 
 namespace GenericPopulation;
 
+/// <summary>
+/// Avgrenser hvilke skjemaegenskaper motoren kan håndtere. Dette er appens støttede delmengde
+/// av FHIR/SDC, ikke en full FHIR-validator; ustøttede funksjoner avvises fremfor å ignoreres.
+/// </summary>
 public static class QuestionnaireGuard
 {
     private static readonly HashSet<QType> Supported =
     [QType.Group, QType.Display, QType.Boolean, QType.Integer, QType.Decimal,
      QType.Date, QType.DateTime, QType.Time, QType.String, QType.Text, QType.Url, QType.Quantity];
 
+    /// <summary>Kontrollerer versjon, pasientkontekst, struktur og uttrykk før Q behandles.</summary>
     public static void Validate(Questionnaire q)
     {
         if (string.IsNullOrWhiteSpace(q.Url) || string.IsNullOrWhiteSpace(q.Version))
@@ -28,6 +33,8 @@ public static class QuestionnaireGuard
         Visit(q.Item, ids, 0);
     }
 
+    // Felles ID-sett for hele treet sikrer entydig kobling til QR; grenser på dybde og antall
+    // beskytter rekursjonen og gjør arbeidsmengden per skjema begrenset.
     private static void Visit(IEnumerable<Questionnaire.ItemComponent> items, HashSet<string> ids, int depth)
     {
         if (depth > 12) throw new PopulationException("questionnaire-size", "For dypt Q-hierarki.");
@@ -52,6 +59,8 @@ public static class QuestionnaireGuard
         }
     }
 
+    // Roten kan etablere launchContext og variabler; spørsmål kan også ha initialExpression.
+    // Variabelnavn er lokale for nivået, men vertens reserverte kontekst kan ikke overskrives.
     private static void CheckExtensions(IEnumerable<Extension> extensions, bool root)
     {
         var localNames = new HashSet<string>();

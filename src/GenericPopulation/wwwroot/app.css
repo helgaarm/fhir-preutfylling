@@ -1,3 +1,4 @@
+/* Felles farger og typografi. Resten følger sidens rekkefølge: topp, kilde, editor og resultat. */
 :root {
   --ink:#173d38;
   --muted:#667b77;
@@ -30,6 +31,7 @@ button:disabled,select:disabled {
   opacity:.5;
   cursor:wait
 }
+/* Synlig tastaturfokus; hidden må vinne over komponentenes display-regler når app.js bytter tilstand. */
 button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,[tabindex]:focus-visible {
   outline:3px solid #45a999;
   outline-offset:3px
@@ -37,6 +39,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 [hidden] {
   display:none!important
 }
+/* Toppfelt med appnavn og miljømerke. */
 .topbar {
   height:76px;
   border-bottom:1px solid var(--border);
@@ -100,6 +103,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   font-size:10px;
   color:var(--muted)
 }
+/* Sidebredde, introduksjon og illustrert flyt fra Questionnaire til svar. */
 main {
   max-width:1520px;
   margin:auto;
@@ -161,6 +165,7 @@ h1 {
   font-style:normal;
   color:#91a59c
 }
+/* Felles kort og kildevalg, inkludert den kildeavhengige pasientvelgeren. */
 .card {
   background:white;
   border:1px solid var(--border);
@@ -267,6 +272,7 @@ h1 {
   color:var(--muted);
   font-size:11px
 }
+/* Arbeidsflate: skjemaeditor og resultat ved siden av hverandre på brede skjermer. */
 .workspace {
   display:grid;
   grid-template-columns:1fr 1fr;
@@ -309,6 +315,7 @@ h1 {
 .text-button:hover {
   background:#eef5ef
 }
+/* Eksempelvalg, JSON-editor og handlingen som starter preutfyllingen. */
 .editor-toolbar {
   display:flex;
   align-items:center;
@@ -395,6 +402,7 @@ textarea {
   color:#7b8d83;
   margin-top:10px
 }
+/* Resultatets tilstander: tomt, innhenting og ferdig QR med nøkkeltall. */
 .output-card {
   min-height:660px
 }
@@ -492,6 +500,7 @@ textarea {
   font-size:10px;
   color:var(--muted)
 }
+/* Resultatfaner og lesbar gjengivelse av spørsmål, grupper og manglende svar. */
 .tabs {
   display:flex;
   border-top:1px solid var(--border);
@@ -568,6 +577,7 @@ textarea {
   margin:20px 0 2px;
   font-weight:600
 }
+/* Original QR JSON, merknader og eksporthandlinger. */
 .json-panel {
   background:#fcfdfb
 }
@@ -624,6 +634,7 @@ pre {
 .secondary-button:hover {
   background:#e3eedf
 }
+/* Felles status-/feilmelding og bunntekst. */
 .message {
   border:1px solid #cddfd1;
   background:#f0f7ef;
@@ -675,6 +686,7 @@ footer p {
     transform:rotate(360deg)
   }
 }
+/* Tilgjengelig navn for skjermlesere uten synlig tekst i layouten. */
 .sr-only {
   position:absolute;
   width:1px;
@@ -683,6 +695,7 @@ footer p {
   clip:rect(0,0,0,0);
   white-space:nowrap
 }
+/* Responsiv layout: mer plass på store skjermer, deretter stabling for smalere skjermer. */
 @media(min-width:1500px) {
   textarea {
     height:420px
@@ -810,6 +823,7 @@ footer p {
     gap:10px
   }
 }
+/* Respekter brukerens ønske om mindre bevegelse, også under innhenting. */
 @media(prefers-reduced-motion:reduce) {
   *,*:before,*:after {
     animation-duration:.01ms!important;

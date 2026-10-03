@@ -1,4 +1,9 @@
-"""HTTP regression tests. Start the app first. Standard-library Python only."""
+"""Regresjonstester av appens offentlige HTTP-endepunkter med lokal demokilde.
+
+Start appen først, og kjør python verification/http-smoke.py [baseadresse].
+Bruker bare standardbiblioteket. Kontrollerer svar, validering og HTTP-beskyttelse,
+og skriver et syntetisk QR-eksempel til verification/actual-response-pregnancy.json.
+"""
 import copy
 import json
 import sys
@@ -11,6 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 COUNT = 0
 
 def call(path, body=None, headers=None, raw=None):
+    """Send JSON eller rå testinput; les også HTTP-feilsvar som data testene kan kontrollere."""
     data = raw if raw is not None else json.dumps(body).encode() if body is not None else None
     h = {'Content-Type': 'application/json'} if data is not None else {}
     h.update(headers or {})
@@ -31,6 +37,15 @@ def check(ok, name):
 def flat(items):
     return [entry for item in items for entry in [item, *flat(item.get('item', []))]]
 
+# Lisensvisningen må være tilgjengelig også fra den publiserte appen, med komplette tekster.
+with urllib.request.urlopen(BASE + '/licenses', timeout=10) as response:
+    license_text = response.read().decode('utf-8').replace('\r\n', '\n')
+    check(response.status == 200 and response.headers.get_content_type() == 'text/plain', 'Public license view')
+    legal_files = [ROOT / 'LICENSE', *(ROOT / 'LICENSES').glob('*.txt')]
+    check(all(path.read_text(encoding='utf-8-sig').strip() in license_text for path in legal_files),
+          'Complete copyright, license and terminology notices are served')
+
+# Start med et gyldig skjema og varier deretter input for å kontrollere feiltilfellene.
 q = json.loads((ROOT / 'examples/questionnaire-pregnancy.json').read_text())
 body = {'sourceId': 'demo', 'patientId': 'demo-patient', 'questionnaire': q}
 status, data, headers = call('/api/populate', body)

@@ -1,0 +1,286 @@
+{
+  "schemaVersion": 1,
+  "reviewedOn": "2026-10-04",
+  "hashNormalization": "UTF-8 without BOM; CRLF/CR normalized to LF; trailing whitespace preserved",
+  "scope": "NuGet packages for framework-dependent net9.0; not a complete SBOM for runtimes, containers or development tools",
+  "targetFrameworks": {
+    "net9.0": [
+      {
+        "id": "Hl7.Fhir.R4",
+        "version": "6.6.0",
+        "dependencyType": "Direct",
+        "licenseExpression": "BSD-3-Clause",
+        "contentHash": "++RpQMkqeVA2Nh99nJKt+gN2z3uBi+uusro+MbY6MiBzeC/IhQp/2LLX7lSd0MHGfILEZqVBZKgYVcRQcYtsEg==",
+        "copyright": "Copyright 2013-2024 Firely.  Contains materials (C) HL7 International",
+        "repository": {
+          "type": "git",
+          "url": "https://github.com/FirelyTeam/firely-net-sdk",
+          "commit": "da98b807e006afa1b8ee9ae449932935fb835c23"
+        },
+        "packageUrl": "https://www.nuget.org/packages/Hl7.Fhir.R4/6.6.0",
+        "legalFiles": [
+          "LICENSES/Firely-SDK-BSD-3-Clause.txt"
+        ],
+        "packagedLegalFiles": {}
+      },
+      {
+        "id": "Fhir.Metrics",
+        "version": "1.4.0",
+        "dependencyType": "Transitive",
+        "licenseExpression": "BSD-3-Clause",
+        "contentHash": "SxpoHR46khpzQG4rOX+rJduPeuH3h9rEpEoguraOft24E0tMnnDk8CuTMVF3fMudsdyo5addKBf+wGngWHwgOQ==",
+        "copyright": "Copyright 2013-2023 Firely.  Contains materials (C) HL7 International",
+        "repository": {
+          "type": "git",
+          "url": "https://github.com/FirelyTeam/Fhir.Metrics",
+          "commit": "b95488943b6cfccb2b24470fb8da4407c9f03537"
+        },
+        "packageUrl": "https://www.nuget.org/packages/Fhir.Metrics/1.4.0",
+        "legalFiles": [
+          "LICENSES/Firely-Metrics-BSD-3-Clause.txt"
+        ],
+        "packagedLegalFiles": {}
+      },
+      {
+        "id": "Hl7.Fhir.Base",
+        "version": "6.6.0",
+        "dependencyType": "Transitive",
+        "licenseExpression": "BSD-3-Clause",
+        "contentHash": "LS4RUWvKAZ6JsR5kPQuO1lTRlN/bSEI9G06mNUOXNR1iR0TJarPcqzB8Me3EVTuuuzOyW71U1CWsULoOAHbp3w==",
+        "copyright": "Copyright 2013-2024 Firely.  Contains materials (C) HL7 International",
+        "repository": {
+          "type": "git",
+          "url": "https://github.com/FirelyTeam/firely-net-sdk",
+          "commit": "da98b807e006afa1b8ee9ae449932935fb835c23"
+        },
+        "packageUrl": "https://www.nuget.org/packages/Hl7.Fhir.Base/6.6.0",
+        "legalFiles": [
+          "LICENSES/Firely-SDK-BSD-3-Clause.txt"
+        ],
+        "packagedLegalFiles": {}
+      },
+      {
+        "id": "Hl7.Fhir.Conformance",
+        "version": "6.6.0",
+        "dependencyType": "Transitive",
+        "licenseExpression": "BSD-3-Clause",
+        "contentHash": "NMf9T6ap3T5QIMup87edkppZA8feWf+6XCIWxHKWnbfNyUZeyMcdOzA4OgR48Rp4dxvMyG67tNyDVDwdN+yIvA==",
+        "copyright": "Copyright 2013-2024 Firely.  Contains materials (C) HL7 International",
+        "repository": {
+          "type": "git",
+          "url": "https://github.com/FirelyTeam/firely-net-sdk",
+          "commit": "da98b807e006afa1b8ee9ae449932935fb835c23"
+        },
+        "packageUrl": "https://www.nuget.org/packages/Hl7.Fhir.Conformance/6.6.0",
+        "legalFiles": [
+          "LICENSES/Firely-SDK-BSD-3-Clause.txt"
+        ],
+        "packagedLegalFiles": {}
+      },
+      {
+        "id": "Microsoft.Extensions.Caching.Abstractions",
+        "version": "8.0.0",
+        "dependencyType": "Transitive",
+        "licenseExpression": "MIT",
+        "contentHash": "3KuSxeHoNYdxVYfg2IRZCThcrlJ1XJqIXkAWikCsbm5C/bCjv7G0WoKDyuR98Q+T607QT2Zl5GsbGRkENcV2yQ==",
+        "copyright": "© Microsoft Corporation. All rights reserved.",
+        "repository": {
+          "type": "git",
+          "url": "https://github.com/dotnet/runtime",
+          "commit": "5535e31a712343a63f5d7d796cd874e563e5ac14"
+        },
+        "packageUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Caching.Abstractions/8.0.0",
+        "legalFiles": [
+          "LICENSES/Microsoft-MIT.txt",
+          "LICENSES/Microsoft-Extensions-NOTICES-8.0.0.txt"
+        ],
+        "packagedLegalFiles": {
+          "LICENSE.TXT": "LICENSES/Microsoft-MIT.txt",
+          "THIRD-PARTY-NOTICES.TXT": "LICENSES/Microsoft-Extensions-NOTICES-8.0.0.txt"
+        }
+      },
+      {
+        "id": "Microsoft.Extensions.Caching.Memory",
+        "version": "8.0.1",
+        "dependencyType": "Transitive",
+        "licenseExpression": "MIT",
+        "contentHash": "HFDnhYLccngrzyGgHkjEDU5FMLn4MpOsr5ElgsBMC4yx6lJh4jeWO7fHS8+TXPq+dgxCmUa/Trl8svObmwW4QA==",
+        "copyright": "© Microsoft Corporation. All rights reserved.",
+        "repository": {
+          "type": "git",
+          "url": "https://github.com/dotnet/runtime",
+          "commit": "81cabf2857a01351e5ab578947c7403a5b128ad1"
+        },
+        "packageUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Caching.Memory/8.0.1",
+        "legalFiles": [
+          "LICENSES/Microsoft-MIT.txt",
+          "LICENSES/Microsoft-Extensions-NOTICES-8.0.1.txt"
+        ],
+        "packagedLegalFiles": {
+          "LICENSE.TXT": "LICENSES/Microsoft-MIT.txt",
+          "THIRD-PARTY-NOTICES.TXT": "LICENSES/Microsoft-Extensions-NOTICES-8.0.1.txt"
+        }
+      },
+      {
+        "id": "Microsoft.Extensions.DependencyInjection.Abstractions",
+        "version": "8.0.2",
+        "dependencyType": "Transitive",
+        "licenseExpression": "MIT",
+        "contentHash": "3iE7UF7MQkCv1cxzCahz+Y/guQbTqieyxyaWKhrRO91itI9cOKO76OHeQDahqG4MmW5umr3CcCvGmK92lWNlbg==",
+        "copyright": "© Microsoft Corporation. All rights reserved.",
+        "repository": {
+          "type": "git",
+          "url": "https://github.com/dotnet/runtime",
+          "commit": "81cabf2857a01351e5ab578947c7403a5b128ad1"
+        },
+        "packageUrl": "https://www.nuget.org/packages/Microsoft.Extensions.DependencyInjection.Abstractions/8.0.2",
+        "legalFiles": [
+          "LICENSES/Microsoft-MIT.txt",
+          "LICENSES/Microsoft-Extensions-NOTICES-8.0.1.txt"
+        ],
+        "packagedLegalFiles": {
+          "LICENSE.TXT": "LICENSES/Microsoft-MIT.txt",
+          "THIRD-PARTY-NOTICES.TXT": "LICENSES/Microsoft-Extensions-NOTICES-8.0.1.txt"
+        }
+      },
+      {
+        "id": "Microsoft.Extensions.Logging.Abstractions",
+        "version": "8.0.2",
+        "dependencyType": "Transitive",
+        "licenseExpression": "MIT",
+        "contentHash": "nroMDjS7hNBPtkZqVBbSiQaQjWRDxITI8Y7XnDs97rqG3EbzVTNLZQf7bIeUJcaHOV8bca47s1Uxq94+2oGdxA==",
+        "copyright": "© Microsoft Corporation. All rights reserved.",
+        "repository": {
+          "type": "git",
+          "url": "https://github.com/dotnet/runtime",
+          "commit": "81cabf2857a01351e5ab578947c7403a5b128ad1"
+        },
+        "packageUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Logging.Abstractions/8.0.2",
+        "legalFiles": [
+          "LICENSES/Microsoft-MIT.txt",
+          "LICENSES/Microsoft-Extensions-NOTICES-8.0.1.txt"
+        ],
+        "packagedLegalFiles": {
+          "LICENSE.TXT": "LICENSES/Microsoft-MIT.txt",
+          "THIRD-PARTY-NOTICES.TXT": "LICENSES/Microsoft-Extensions-NOTICES-8.0.1.txt"
+        }
+      },
+      {
+        "id": "Microsoft.Extensions.Options",
+        "version": "8.0.2",
+        "dependencyType": "Transitive",
+        "licenseExpression": "MIT",
+        "contentHash": "dWGKvhFybsaZpGmzkGCbNNwBD1rVlWzrZKANLW/CcbFJpCEceMCGzT7zZwHOGBCbwM0SzBuceMj5HN1LKV1QqA==",
+        "copyright": "© Microsoft Corporation. All rights reserved.",
+        "repository": {
+          "type": "git",
+          "url": "https://github.com/dotnet/runtime",
+          "commit": "1381d5ebd2ab1f292848d5b19b80cf71ac332508"
+        },
+        "packageUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/8.0.2",
+        "legalFiles": [
+          "LICENSES/Microsoft-MIT.txt",
+          "LICENSES/Microsoft-Extensions-NOTICES-8.0.0.txt"
+        ],
+        "packagedLegalFiles": {
+          "LICENSE.TXT": "LICENSES/Microsoft-MIT.txt",
+          "THIRD-PARTY-NOTICES.TXT": "LICENSES/Microsoft-Extensions-NOTICES-8.0.0.txt"
+        }
+      },
+      {
+        "id": "Microsoft.Extensions.Primitives",
+        "version": "8.0.0",
+        "dependencyType": "Transitive",
+        "licenseExpression": "MIT",
+        "contentHash": "bXJEZrW9ny8vjMF1JV253WeLhpEVzFo1lyaZu1vQ4ZxWUlVvknZ/+ftFgVheLubb4eZPSwwxBeqS1JkCOjxd8g==",
+        "copyright": "© Microsoft Corporation. All rights reserved.",
+        "repository": {
+          "type": "git",
+          "url": "https://github.com/dotnet/runtime",
+          "commit": "5535e31a712343a63f5d7d796cd874e563e5ac14"
+        },
+        "packageUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Primitives/8.0.0",
+        "legalFiles": [
+          "LICENSES/Microsoft-MIT.txt",
+          "LICENSES/Microsoft-Extensions-NOTICES-8.0.0.txt"
+        ],
+        "packagedLegalFiles": {
+          "LICENSE.TXT": "LICENSES/Microsoft-MIT.txt",
+          "THIRD-PARTY-NOTICES.TXT": "LICENSES/Microsoft-Extensions-NOTICES-8.0.0.txt"
+        }
+      },
+      {
+        "id": "Newtonsoft.Json",
+        "version": "13.0.4",
+        "dependencyType": "Transitive",
+        "licenseExpression": "MIT",
+        "contentHash": "pdgNNMai3zv51W5aq268sujXUyx7SNdE2bj1wZcWjAQrKMFZV260lbqYop1d2GM67JI1huLRwxo9ZqnfF/lC6A==",
+        "copyright": "Copyright © James Newton-King 2008",
+        "repository": {
+          "type": "git",
+          "url": "https://github.com/JamesNK/Newtonsoft.Json",
+          "commit": "4e13299d4b0ec96bd4df9954ef646bd2d1b5bf2a"
+        },
+        "packageUrl": "https://www.nuget.org/packages/Newtonsoft.Json/13.0.4",
+        "legalFiles": [
+          "LICENSES/Newtonsoft.Json-MIT.txt"
+        ],
+        "packagedLegalFiles": {
+          "LICENSE.md": "LICENSES/Newtonsoft.Json-MIT.txt"
+        }
+      }
+    ]
+  },
+  "legalFiles": [
+    {
+      "path": "LICENSES/Firely-SDK-BSD-3-Clause.txt",
+      "sha256NormalizedUtf8": "59c221d9d7d67491ed3aaa4d59a2cac5bff1e05f6b8f903a2c82a71bcc310a3d",
+      "source": "https://raw.githubusercontent.com/FirelyTeam/firely-net-sdk/da98b807e006afa1b8ee9ae449932935fb835c23/LICENSE"
+    },
+    {
+      "path": "LICENSES/Firely-Metrics-BSD-3-Clause.txt",
+      "sha256NormalizedUtf8": "93280534269c214053403ce58b57e8cb4c20ad4e56c941d0d6baf1e7889d890e",
+      "source": "https://raw.githubusercontent.com/FirelyTeam/Fhir.Metrics/b95488943b6cfccb2b24470fb8da4407c9f03537/LICENSE"
+    },
+    {
+      "path": "LICENSES/Microsoft-MIT.txt",
+      "sha256NormalizedUtf8": "cfc21f5e8bd655ae997eec916138b707b1d290b83272c02a95c9f821b8c87310",
+      "source": "https://www.nuget.org/packages/Microsoft.Extensions.Caching.Abstractions/8.0.0"
+    },
+    {
+      "path": "LICENSES/Microsoft-Extensions-NOTICES-8.0.0.txt",
+      "sha256NormalizedUtf8": "7238e7fd468427aa3fe45b1d0cee1c3e2d93ff96692820768521e9780225d473",
+      "source": "https://www.nuget.org/packages/Microsoft.Extensions.Caching.Abstractions/8.0.0"
+    },
+    {
+      "path": "LICENSES/Microsoft-Extensions-NOTICES-8.0.1.txt",
+      "sha256NormalizedUtf8": "97c1a7b3da6a4c6ad516448719f45114b41a4d4c5aa300a944476e2e4f5da438",
+      "source": "https://www.nuget.org/packages/Microsoft.Extensions.Caching.Memory/8.0.1"
+    },
+    {
+      "path": "LICENSES/Newtonsoft.Json-MIT.txt",
+      "sha256NormalizedUtf8": "d7f83bbea3264a8e23d7739e44d9db1a4994b357274df6f00876eb2e623827ad",
+      "source": "https://www.nuget.org/packages/Newtonsoft.Json/13.0.4"
+    },
+    {
+      "path": "LICENSES/Dotnet-Runtime-NOTICES-9.0.20.txt",
+      "sha256NormalizedUtf8": "fa3e9d0a2c52476f04fe798d7dc4f6e7edb7b68a3d2f4d5f59a39bce957eedc8",
+      "source": "https://raw.githubusercontent.com/dotnet/runtime/v9.0.20/THIRD-PARTY-NOTICES.TXT"
+    },
+    {
+      "path": "LICENSES/LOINC_short_license.txt",
+      "sha256NormalizedUtf8": "11d7f9b6086a9e649118177bf41666ecda13fee08c53ffad094a09cec6a7df68",
+      "source": "https://loinc.org/license"
+    },
+    {
+      "path": "LICENSES/UCUM-NOTICE.txt",
+      "sha256NormalizedUtf8": "b0f0f14489b9dc3c9261fc2fdd30376c1611c94657bad08020127fdf56d26249",
+      "source": "https://ucum.org/license"
+    },
+    {
+      "path": "LICENSES/SNOMED-CT-NOTICE.txt",
+      "sha256NormalizedUtf8": "27a5a0bcf69febe9bc94b7a58d7f0b9b4aaa2694ffa787edf16f6252614ca826",
+      "source": "https://www.snomed.org/get-snomed"
+    }
+  ]
+}

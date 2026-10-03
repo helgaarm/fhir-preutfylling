@@ -3,6 +3,10 @@ using Hl7.Fhir.Model;
 
 namespace GenericPopulation;
 
+/// <summary>
+/// Beskriver et relativt, pasientavgrenset søk uavhengig av transport og serveradresse.
+/// Bruk Parse eller FromTemplate for å kontrollere søket før det sendes til en datakilde.
+/// </summary>
 public sealed record FhirSearch(string ResourceType,
     IReadOnlyList<KeyValuePair<string, string>> Parameters)
 {
@@ -11,14 +15,18 @@ public sealed record FhirSearch(string ResourceType,
     private static readonly HashSet<string> AllowedParameters =
         ["patient", "code", "category", "date"];
 
+    /// <summary>Leser en enkeltverdi; bruk Parameters ved gjentatte date-grenser i vanlig FHIR.</summary>
     public string? Get(string name) => Parameters
         .Where(p => p.Key == name).Select(p => p.Value).SingleOrDefault();
 
+    /// <summary>URL-koder søket for GET og for motorens cache. DHG oversetter det til POST-felter.</summary>
     public string RelativeUrl => ResourceType + "?" + string.Join("&", Parameters.Select(p =>
         Uri.EscapeDataString(p.Key) + "=" + Uri.EscapeDataString(p.Value)));
 
-    // Deliberately restricted x-fhir-query template support: only {{%patient.id}}.
-    // A production SDC implementation can add a bounded template evaluator.
+    /// <summary>
+    /// Setter inn pasientens logiske ressurs-ID i {{%patient.id}} og validerer resultatet.
+    /// Andre maluttrykk støttes ikke; NIN skal ikke settes inn i skjemaets søkemal.
+    /// </summary>
     public static FhirSearch FromTemplate(string template, PopulationContext context)
     {
         var id = context.Patient.Id;
@@ -32,6 +40,10 @@ public sealed record FhirSearch(string ResourceType,
         return Parse(expanded, id);
     }
 
+    /// <summary>
+    /// Tillater bare kjente ressurser og parametre med nøyaktig riktig pasientfilter.
+    /// Absolutte URL-er og utvidelser som _include faller utenfor denne søkeprofilen.
+    /// </summary>
     public static FhirSearch Parse(string relative, string expectedPatientId)
     {
         if (relative.Length > 4096 || relative.Contains('#') || relative.Contains('\\'))
@@ -52,7 +64,7 @@ public sealed record FhirSearch(string ResourceType,
                 throw new PopulationException("query-policy", "Søkeparameteren er ikke tillatt.");
             pairs.Add(new(key, value));
         }
-        // Multiple date bounds are legal. All other duplicate parameters are rejected.
+        // Vanlig FHIR kan bruke flere date-grenser; DHG-klienten har en strengere egen kontroll.
         if (pairs.GroupBy(p => p.Key).Any(g => g.Count() > 1 && g.Key != "date"))
             throw new PopulationException("query-policy", "Tvetydige søkeparametre.");
         if (pairs.Count(p => p.Key == "patient") != 1 ||
@@ -63,7 +75,11 @@ public sealed record FhirSearch(string ResourceType,
         return new(parts[0], pairs);
     }
 
-    // Defence in depth: this is NOT a replacement for source-side authorization.
+    /// <summary>
+    /// Kontrollerer subject-referansen i returnerte kliniske ressurser, også når kilden svarer 200.
+    /// Tillater relativ referanse eller absolutt referanse på godkjent base. Kilden må fortsatt
+    /// håndheve autorisasjon; OperationOutcome behandles separat av klienten eller motoren.
+    /// </summary>
     public static void AssertSubject(Resource resource, string id, Uri? baseUri = null)
     {
         if (resource is OperationOutcome) return;

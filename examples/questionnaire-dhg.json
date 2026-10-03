@@ -1,0 +1,242 @@
+{
+  "resourceType": "Questionnaire",
+  "id": "dhg-demo",
+  "url": "https://example.org/fhir/Questionnaire/dhg-demo",
+  "version": "1.0.0",
+  "status": "active",
+  "title": "DHG – preutfylling med syntetiske testdata",
+  "subjectType": [
+    "Patient"
+  ],
+  "extension": [
+    {
+      "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-launchContext",
+      "extension": [
+        {
+          "url": "name",
+          "valueCoding": {
+            "system": "http://hl7.org/fhir/uv/sdc/CodeSystem/launchContext",
+            "code": "patient"
+          }
+        },
+        {
+          "url": "type",
+          "valueCode": "Patient"
+        }
+      ]
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/variable",
+      "valueExpression": {
+        "name": "observations",
+        "language": "application/x-fhir-query",
+        "expression": "Observation?patient={{%patient.id}}"
+      }
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/variable",
+      "valueExpression": {
+        "name": "gaCandidates",
+        "language": "text/fhirpath",
+        "expression": "%observations.entry.resource.ofType(Observation).where(code.coding.where(system = 'http://loinc.org' and code = '18185-9').exists() and status != 'entered-in-error' and status != 'cancelled' and effective.ofType(dateTime).exists())"
+      }
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/variable",
+      "valueExpression": {
+        "name": "gaLatest",
+        "language": "text/fhirpath",
+        "expression": "%gaCandidates.where(effective = %gaCandidates.effective.aggregate(iif($total.empty(), $this, iif($this > $total, $this, $total))))"
+      }
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/variable",
+      "valueExpression": {
+        "name": "bpCandidates",
+        "language": "text/fhirpath",
+        "expression": "%observations.entry.resource.ofType(Observation).where(code.coding.where(system = 'http://loinc.org' and code = '85354-9').exists() and status != 'entered-in-error' and status != 'cancelled' and effective.ofType(dateTime).exists())"
+      }
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/variable",
+      "valueExpression": {
+        "name": "bpLatest",
+        "language": "text/fhirpath",
+        "expression": "%bpCandidates.where(effective = %bpCandidates.effective.aggregate(iif($total.empty(), $this, iif($this > $total, $this, $total))))"
+      }
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/variable",
+      "valueExpression": {
+        "name": "encounters",
+        "language": "application/x-fhir-query",
+        "expression": "Encounter?patient={{%patient.id}}"
+      }
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/variable",
+      "valueExpression": {
+        "name": "careTeams",
+        "language": "application/x-fhir-query",
+        "expression": "CareTeam?patient={{%patient.id}}"
+      }
+    }
+  ],
+  "item": [
+    {
+      "linkId": "nameText",
+      "text": "Navn slik det er registrert i DHG",
+      "type": "string",
+      "extension": [
+        {
+          "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-initialExpression",
+          "valueExpression": {
+            "language": "text/fhirpath",
+            "expression": "%patient.name.text"
+          }
+        }
+      ],
+      "repeats": true
+    },
+    {
+      "linkId": "birthDate",
+      "text": "Fødselsdato (bare når uttrykkelig oppgitt)",
+      "type": "date",
+      "extension": [
+        {
+          "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-initialExpression",
+          "valueExpression": {
+            "language": "text/fhirpath",
+            "expression": "%patient.birthDate"
+          }
+        }
+      ]
+    },
+    {
+      "linkId": "interpreterRequired",
+      "text": "Behov for tolk",
+      "type": "boolean",
+      "extension": [
+        {
+          "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-initialExpression",
+          "valueExpression": {
+            "language": "text/fhirpath",
+            "expression": "%patient.extension.where(url = 'http://hl7.org/fhir/StructureDefinition/patient-interpreterRequired').value.ofType(boolean)"
+          }
+        }
+      ]
+    },
+    {
+      "linkId": "measurements",
+      "type": "group",
+      "text": "Opplysninger til kontroll",
+      "item": [
+        {
+          "linkId": "gestationalAge",
+          "text": "Registrert svangerskapsalder (på måledato)",
+          "type": "quantity",
+          "extension": [
+            {
+              "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-initialExpression",
+              "valueExpression": {
+                "language": "text/fhirpath",
+                "expression": "%gaLatest.value.ofType(Quantity).where(system = 'http://unitsofmeasure.org' and code = 'd')"
+              }
+            }
+          ]
+        },
+        {
+          "linkId": "systolic",
+          "text": "Registrert systolisk blodtrykk",
+          "type": "quantity",
+          "extension": [
+            {
+              "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-initialExpression",
+              "valueExpression": {
+                "language": "text/fhirpath",
+                "expression": "%bpLatest.component.where(code.coding.where(system = 'http://loinc.org' and code = '8480-6').exists()).value.ofType(Quantity).where(system = 'http://unitsofmeasure.org' and code = 'mm[Hg]')"
+              }
+            }
+          ]
+        },
+        {
+          "linkId": "diastolic",
+          "text": "Registrert diastolisk blodtrykk",
+          "type": "quantity",
+          "extension": [
+            {
+              "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-initialExpression",
+              "valueExpression": {
+                "language": "text/fhirpath",
+                "expression": "%bpLatest.component.where(code.coding.where(system = 'http://loinc.org' and code = '8462-4').exists()).value.ofType(Quantity).where(system = 'http://unitsofmeasure.org' and code = 'mm[Hg]')"
+              }
+            }
+          ]
+        },
+        {
+          "linkId": "measurementDate",
+          "text": "Måletid for registrert svangerskapsalder",
+          "type": "dateTime",
+          "extension": [
+            {
+              "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-initialExpression",
+              "valueExpression": {
+                "language": "text/fhirpath",
+                "expression": "%gaLatest.effective.ofType(dateTime)"
+              }
+            }
+          ]
+        },
+        {
+          "linkId": "comment",
+          "text": "Din kommentar eller korrigering",
+          "type": "text"
+        }
+      ]
+    },
+    {
+      "linkId": "ultrasoundDueDate",
+      "text": "Registrert ultralydtermin",
+      "type": "dateTime",
+      "extension": [
+        {
+          "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-initialExpression",
+          "valueExpression": {
+            "language": "text/fhirpath",
+            "expression": "%observations.entry.resource.ofType(Observation).where(code.coding.where(system = 'http://snomed.info/sct' and code = '738070007').exists() and status != 'entered-in-error' and status != 'cancelled').value.ofType(dateTime)"
+          }
+        }
+      ]
+    },
+    {
+      "linkId": "consultationDates",
+      "text": "Registrerte konsultasjonsdatoer",
+      "type": "dateTime",
+      "extension": [
+        {
+          "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-initialExpression",
+          "valueExpression": {
+            "language": "text/fhirpath",
+            "expression": "%encounters.entry.resource.ofType(Encounter).where(status != 'entered-in-error' and status != 'cancelled').period.start"
+          }
+        }
+      ],
+      "repeats": true
+    },
+    {
+      "linkId": "careTeamContacts",
+      "text": "Registrerte kontaktpersoner i CareTeam",
+      "type": "string",
+      "extension": [
+        {
+          "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-initialExpression",
+          "valueExpression": {
+            "language": "text/fhirpath",
+            "expression": "%careTeams.entry.resource.ofType(CareTeam).contained.ofType(Practitioner).name.text"
+          }
+        }
+      ],
+      "repeats": true
+    }
+  ]
+}

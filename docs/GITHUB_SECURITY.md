@@ -8,8 +8,8 @@ Repoet skal være offentlig. MIT-lisensen gjelder prosjektets egen kode og dokum
 | --- | --- |
 | Reproduserbare avhengigheter | `packages.lock.json`, `dotnet restore --locked-mode` i CI |
 | Sårbare avhengigheter | NuGet audit av alle direkte/transitive pakker; audit-advarsler feiler restore |
-| Tester | Release-bygg, 27 C#-selvtester og HTTP-tester mot publisert app |
-| Endring av avhengigheter | Dependency Review klargjort for PR-er; krever Dependency Graph og eksplisitt aktivering (se nedenfor) |
+| Tester | Release-bygg, C#-selvtester, HTTP-tester mot publisert app og DHG-kontrakttester med lokal syntetisk kilde |
+| Endring av avhengigheter | Dependency Review aktivert for nye PR-kjøringer; forutsetter Dependency Graph og `DEPENDENCY_REVIEW_ENABLED=true` |
 | Oppdateringer | Dependabot for NuGet og GitHub Actions hver uke, uten automatisk fletting |
 | Kodeanalyse | CodeQL med `security-extended` for C# og JavaScript, også ukentlig |
 | Hemmeligheter | Gitleaks over Git-historikken med redigerte funn i logger |
@@ -36,13 +36,21 @@ For en repo-eier uten andre vedlikeholdere brukes PR-krav med **0 påkrevde ekst
 
 Oppsettet bruker **advanced CodeQL workflow**. Ikke aktiver CodeQL default setup samtidig; GitHub kan da avvise resultatopplasting fra den egendefinerte workflowen.
 
-Etter at Dependency Graph er aktivert, sett repository-variabelen `DEPENDENCY_REVIEW_ENABLED` til `true` under **Settings → Secrets and variables → Actions → Variables**. Før aktivering viser GitHub Dependency Review som **skipped**; det er ikke en gjennomført kontroll. NuGet-auditen i `Build and test` er aktiv hele tiden og trenger ikke GitHubs Dependency Graph. Dependabot-kjøringer må også kontrolleres i GitHub etter at funksjonen er slått på.
+Dependency Graph og repository-variabelen `DEPENDENCY_REVIEW_ENABLED=true` ble aktivert og kontrollert 3. oktober 2026. Dependency Review kjøres ved neste PR-hendelse; tidligere kjøringer som er **skipped**, er ikke gjennomførte kontroller. NuGet-auditen i `Build and test` er aktiv hele tiden og trenger ikke GitHubs Dependency Graph. Se [statusrapporten](SECURITY_SETUP_STATUS.md) for skillet mellom aktiverte innstillinger og gjennomførte analyser.
 
-Med egen `gh`-innlogging kan variabelen settes slik etter at Dependency Graph er aktivert:
+Ved nytt oppsett kan variabelen settes med egen `gh`-innlogging etter at Dependency Graph er aktivert:
 
 ```sh
 gh variable set DEPENDENCY_REVIEW_ENABLED --body true --repo helgaarm/fhir-preutfylling
 ```
+
+Oppsettscriptets aktivering av Dependabot-varsler aktiverer også Dependency Graph, slik [GitHubs API-dokumentasjon](https://docs.github.com/en/rest/repos/repos#enable-vulnerability-alerts) beskriver. Kontroller at grafens API er tilgjengelig før variabelen settes:
+
+```sh
+gh api repos/helgaarm/fhir-preutfylling/dependency-graph/compare/main...main
+```
+
+Et vellykket svar med `[]` bekrefter at API-et er tilgjengelig for innloggingen. Sammenligning av samme commit kontrollerer ikke om avhengighetene har sårbarheter. Kontroller første Dependency Review-kjøring i en PR før den eventuelt legges til som en sjette påkrevd statuskontroll.
 
 ## Gjennomfør oppsettet
 
