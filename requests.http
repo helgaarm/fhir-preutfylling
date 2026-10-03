@@ -1,0 +1,20 @@
+@base = http://127.0.0.1:5077
+
+### Konfigurerte datakilder (ingen tokenverdier)
+GET {{base}}/api/config
+
+### Komplett resultat med QR og OperationOutcome
+POST {{base}}/api/populate
+Content-Type: application/json
+
+< ./examples/populate-request.json
+
+### Ren QuestionnaireResponse
+POST {{base}}/api/questionnaire-response
+Content-Type: application/json
+
+< ./examples/populate-request.json
+
+### Syntetisk Patient
+GET {{base}}/demo/fhir/Patient/demo-patient
+Accept: application/fhir+json

@@ -1,0 +1,9 @@
+{
+  "profiles": {
+    "FhirPreutfylling": {
+      "commandName": "Project", "launchBrowser": true,
+      "applicationUrl": "http://127.0.0.1:5077",
+      "environmentVariables": { "ASPNETCORE_ENVIRONMENT": "Development" }
+    }
+  }
+}

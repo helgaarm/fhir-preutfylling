@@ -1,0 +1,95 @@
+{
+  "resourceType": "Questionnaire",
+  "id": "general-demo",
+  "url": "https://example.org/fhir/Questionnaire/general-demo",
+  "version": "1.0.0",
+  "status": "active",
+  "title": "Generisk preutfyllingsdemo – syntetiske data",
+  "subjectType": [
+    "Patient"
+  ],
+  "extension": [
+    {
+      "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-launchContext",
+      "extension": [
+        {
+          "url": "name",
+          "valueCoding": {
+            "system": "http://hl7.org/fhir/uv/sdc/CodeSystem/launchContext",
+            "code": "patient"
+          }
+        },
+        {
+          "url": "type",
+          "valueCode": "Patient"
+        }
+      ]
+    }
+  ],
+  "item": [
+    {
+      "linkId": "person",
+      "type": "group",
+      "text": "Personopplysninger",
+      "item": [
+        {
+          "linkId": "family",
+          "text": "Etternavn",
+          "type": "string",
+          "extension": [
+            {
+              "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-initialExpression",
+              "valueExpression": {
+                "language": "text/fhirpath",
+                "expression": "%patient.name.where(use = 'official').family"
+              }
+            }
+          ]
+        },
+        {
+          "linkId": "given",
+          "text": "Fornavn",
+          "type": "string",
+          "repeats": true,
+          "extension": [
+            {
+              "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-initialExpression",
+              "valueExpression": {
+                "language": "text/fhirpath",
+                "expression": "%patient.name.where(use = 'official').given"
+              }
+            }
+          ]
+        },
+        {
+          "linkId": "birthDate",
+          "text": "Fødselsdato",
+          "type": "date",
+          "extension": [
+            {
+              "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-initialExpression",
+              "valueExpression": {
+                "language": "text/fhirpath",
+                "expression": "%patient.birthDate"
+              }
+            }
+          ]
+        },
+        {
+          "linkId": "recordActive",
+          "text": "Er pasientressursen aktiv? (teknisk demo)",
+          "type": "boolean",
+          "extension": [
+            {
+              "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-initialExpression",
+              "valueExpression": {
+                "language": "text/fhirpath",
+                "expression": "%patient.active"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

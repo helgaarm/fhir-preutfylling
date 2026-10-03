@@ -1,0 +1,82 @@
+{
+  "resourceType": "QuestionnaireResponse",
+  "id": "expected-example-not-runtime-output",
+  "questionnaire": "https://example.org/fhir/Questionnaire/pregnancy-demo|1.0.0",
+  "status": "in-progress",
+  "subject": {
+    "reference": "Patient/demo-patient"
+  },
+  "authored": "2026-10-03T08:00:00Z",
+  "item": [
+    {
+      "linkId": "birthDate",
+      "text": "Fødselsdato",
+      "answer": [
+        {
+          "valueDate": "1994-04-23"
+        }
+      ]
+    },
+    {
+      "linkId": "measurements",
+      "text": "Opplysninger til kontroll",
+      "item": [
+        {
+          "linkId": "gestationalAge",
+          "text": "Registrert svangerskapsalder (på måledato)",
+          "answer": [
+            {
+              "valueQuantity": {
+                "value": 210,
+                "unit": "dager",
+                "system": "http://unitsofmeasure.org",
+                "code": "d"
+              }
+            }
+          ]
+        },
+        {
+          "linkId": "systolic",
+          "text": "Registrert systolisk blodtrykk",
+          "answer": [
+            {
+              "valueQuantity": {
+                "value": 128,
+                "unit": "mmHg",
+                "system": "http://unitsofmeasure.org",
+                "code": "mm[Hg]"
+              }
+            }
+          ]
+        },
+        {
+          "linkId": "diastolic",
+          "text": "Registrert diastolisk blodtrykk",
+          "answer": [
+            {
+              "valueQuantity": {
+                "value": 76,
+                "unit": "mmHg",
+                "system": "http://unitsofmeasure.org",
+                "code": "mm[Hg]"
+              }
+            }
+          ]
+        },
+        {
+          "linkId": "measurementDate",
+          "text": "Måletid for registrert svangerskapsalder",
+          "answer": [
+            {
+              "valueDateTime": "2026-08-20"
+            }
+          ]
+        },
+        {
+          "linkId": "comment",
+          "text": "Din kommentar eller korrigering"
+        }
+      ]
+    }
+  ]
+}

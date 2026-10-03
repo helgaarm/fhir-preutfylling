@@ -1,0 +1,16 @@
+{
+  "resourceType": "Patient",
+  "id": "demo-patient",
+  "active": false,
+  "name": [
+    {
+      "use": "official",
+      "family": "Eksempel",
+      "given": [
+        "Ada",
+        "Demo"
+      ]
+    }
+  ],
+  "birthDate": "1994-04-23"
+}

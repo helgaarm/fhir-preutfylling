@@ -1,0 +1,20 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "FHIR preutfylling · web", "type": "coreclr", "request": "launch",
+      "preLaunchTask": "build",
+      "program": "${workspaceFolder}/src/GenericPopulation/bin/Debug/net10.0/GenericPopulation.dll",
+      "cwd": "${workspaceFolder}/src/GenericPopulation",
+      "env": { "ASPNETCORE_ENVIRONMENT": "Development" },
+      "console": "internalConsole",
+      "serverReadyAction": { "action": "openExternally", "pattern": "FHIR preutfylling: (https?://\\S+)" }
+    },
+    {
+      "name": "FHIR preutfylling · selvtester", "type": "coreclr", "request": "launch",
+      "preLaunchTask": "build",
+      "program": "${workspaceFolder}/src/GenericPopulation/bin/Debug/net10.0/GenericPopulation.dll",
+      "args": ["--self-test"], "cwd": "${workspaceFolder}", "console": "internalConsole"
+    }
+  ]
+}

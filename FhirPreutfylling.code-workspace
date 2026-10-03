@@ -1,0 +1,4 @@
+{
+  "folders": [{ "path": "." }],
+  "settings": { "dotnet.defaultSolution": "FhirPreutfylling.slnx" }
+}

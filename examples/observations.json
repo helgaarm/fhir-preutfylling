@@ -1,0 +1,119 @@
+{
+  "resourceType": "Bundle",
+  "type": "searchset",
+  "total": 3,
+  "entry": [
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "ga-old",
+        "status": "unknown",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "18185-9"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "Patient/demo-patient"
+        },
+        "effectiveDateTime": "2026-08-13",
+        "valueQuantity": {
+          "value": 203,
+          "unit": "dager",
+          "system": "http://unitsofmeasure.org",
+          "code": "d"
+        }
+      },
+      "search": {
+        "mode": "match"
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "ga-current",
+        "status": "unknown",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "18185-9"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "Patient/demo-patient"
+        },
+        "effectiveDateTime": "2026-08-20",
+        "valueQuantity": {
+          "value": 210,
+          "unit": "dager",
+          "system": "http://unitsofmeasure.org",
+          "code": "d"
+        }
+      },
+      "search": {
+        "mode": "match"
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "bp-current",
+        "status": "unknown",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "85354-9"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "Patient/demo-patient"
+        },
+        "effectiveDateTime": "2026-08-20",
+        "component": [
+          {
+            "code": {
+              "coding": [
+                {
+                  "system": "http://loinc.org",
+                  "code": "8480-6"
+                }
+              ]
+            },
+            "valueQuantity": {
+              "value": 128,
+              "unit": "mmHg",
+              "system": "http://unitsofmeasure.org",
+              "code": "mm[Hg]"
+            }
+          },
+          {
+            "code": {
+              "coding": [
+                {
+                  "system": "http://loinc.org",
+                  "code": "8462-4"
+                }
+              ]
+            },
+            "valueQuantity": {
+              "value": 76,
+              "unit": "mmHg",
+              "system": "http://unitsofmeasure.org",
+              "code": "mm[Hg]"
+            }
+          }
+        ]
+      },
+      "search": {
+        "mode": "match"
+      }
+    }
+  ]
+}

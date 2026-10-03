@@ -1,0 +1,15 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "build", "type": "process", "command": "dotnet",
+      "args": ["build", "${workspaceFolder}/FhirPreutfylling.slnx"],
+      "problemMatcher": "$msCompile", "group": { "kind": "build", "isDefault": true }
+    },
+    {
+      "label": "self-test", "type": "process", "command": "dotnet",
+      "args": ["run", "--project", "${workspaceFolder}/src/GenericPopulation", "--", "--self-test"],
+      "problemMatcher": "$msCompile", "group": "test"
+    }
+  ]
+}

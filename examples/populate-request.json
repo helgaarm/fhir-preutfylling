@@ -1,0 +1,165 @@
+{
+  "sourceId": "demo",
+  "patientId": "demo-patient",
+  "questionnaire": {
+    "resourceType": "Questionnaire",
+    "id": "pregnancy-demo",
+    "url": "https://example.org/fhir/Questionnaire/pregnancy-demo",
+    "version": "1.0.0",
+    "status": "active",
+    "title": "Svangerskapsopplysninger – kun demodata",
+    "subjectType": [
+      "Patient"
+    ],
+    "extension": [
+      {
+        "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-launchContext",
+        "extension": [
+          {
+            "url": "name",
+            "valueCoding": {
+              "system": "http://hl7.org/fhir/uv/sdc/CodeSystem/launchContext",
+              "code": "patient"
+            }
+          },
+          {
+            "url": "type",
+            "valueCode": "Patient"
+          }
+        ]
+      },
+      {
+        "url": "http://hl7.org/fhir/StructureDefinition/variable",
+        "valueExpression": {
+          "name": "gaBundle",
+          "language": "application/x-fhir-query",
+          "expression": "Observation?patient={{%patient.id}}&code=http://loinc.org|18185-9"
+        }
+      },
+      {
+        "url": "http://hl7.org/fhir/StructureDefinition/variable",
+        "valueExpression": {
+          "name": "gaCandidates",
+          "language": "text/fhirpath",
+          "expression": "%gaBundle.entry.resource.ofType(Observation).where(status != 'entered-in-error' and status != 'cancelled' and effective.ofType(dateTime).exists())"
+        }
+      },
+      {
+        "url": "http://hl7.org/fhir/StructureDefinition/variable",
+        "valueExpression": {
+          "name": "gaLatest",
+          "language": "text/fhirpath",
+          "expression": "%gaCandidates.where(effective = %gaCandidates.effective.aggregate(iif($total.empty(), $this, iif($this > $total, $this, $total))))"
+        }
+      },
+      {
+        "url": "http://hl7.org/fhir/StructureDefinition/variable",
+        "valueExpression": {
+          "name": "bpBundle",
+          "language": "application/x-fhir-query",
+          "expression": "Observation?patient={{%patient.id}}&code=http://loinc.org|85354-9"
+        }
+      },
+      {
+        "url": "http://hl7.org/fhir/StructureDefinition/variable",
+        "valueExpression": {
+          "name": "bpCandidates",
+          "language": "text/fhirpath",
+          "expression": "%bpBundle.entry.resource.ofType(Observation).where(status != 'entered-in-error' and status != 'cancelled' and effective.ofType(dateTime).exists())"
+        }
+      },
+      {
+        "url": "http://hl7.org/fhir/StructureDefinition/variable",
+        "valueExpression": {
+          "name": "bpLatest",
+          "language": "text/fhirpath",
+          "expression": "%bpCandidates.where(effective = %bpCandidates.effective.aggregate(iif($total.empty(), $this, iif($this > $total, $this, $total))))"
+        }
+      }
+    ],
+    "item": [
+      {
+        "linkId": "birthDate",
+        "text": "Fødselsdato",
+        "type": "date",
+        "extension": [
+          {
+            "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-initialExpression",
+            "valueExpression": {
+              "language": "text/fhirpath",
+              "expression": "%patient.birthDate"
+            }
+          }
+        ]
+      },
+      {
+        "linkId": "measurements",
+        "type": "group",
+        "text": "Opplysninger til kontroll",
+        "item": [
+          {
+            "linkId": "gestationalAge",
+            "text": "Registrert svangerskapsalder (på måledato)",
+            "type": "quantity",
+            "extension": [
+              {
+                "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-initialExpression",
+                "valueExpression": {
+                  "language": "text/fhirpath",
+                  "expression": "%gaLatest.value.ofType(Quantity).where(system = 'http://unitsofmeasure.org' and code = 'd')"
+                }
+              }
+            ]
+          },
+          {
+            "linkId": "systolic",
+            "text": "Registrert systolisk blodtrykk",
+            "type": "quantity",
+            "extension": [
+              {
+                "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-initialExpression",
+                "valueExpression": {
+                  "language": "text/fhirpath",
+                  "expression": "%bpLatest.component.where(code.coding.where(system = 'http://loinc.org' and code = '8480-6').exists()).value.ofType(Quantity).where(system = 'http://unitsofmeasure.org' and code = 'mm[Hg]')"
+                }
+              }
+            ]
+          },
+          {
+            "linkId": "diastolic",
+            "text": "Registrert diastolisk blodtrykk",
+            "type": "quantity",
+            "extension": [
+              {
+                "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-initialExpression",
+                "valueExpression": {
+                  "language": "text/fhirpath",
+                  "expression": "%bpLatest.component.where(code.coding.where(system = 'http://loinc.org' and code = '8462-4').exists()).value.ofType(Quantity).where(system = 'http://unitsofmeasure.org' and code = 'mm[Hg]')"
+                }
+              }
+            ]
+          },
+          {
+            "linkId": "measurementDate",
+            "text": "Måletid for registrert svangerskapsalder",
+            "type": "dateTime",
+            "extension": [
+              {
+                "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-initialExpression",
+                "valueExpression": {
+                  "language": "text/fhirpath",
+                  "expression": "%gaLatest.effective.ofType(dateTime)"
+                }
+              }
+            ]
+          },
+          {
+            "linkId": "comment",
+            "text": "Din kommentar eller korrigering",
+            "type": "text"
+          }
+        ]
+      }
+    ]
+  }
+}
