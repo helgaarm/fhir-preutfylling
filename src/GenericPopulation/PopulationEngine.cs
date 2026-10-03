@@ -3,11 +3,19 @@ using QType = Hl7.Fhir.Model.Questionnaire.QuestionnaireItemType;
 
 namespace GenericPopulation;
 
+/// <summary>
+/// Bygger svar fra et Questionnaire (Q), en pasient og en datakilde: binder variabler,
+/// evaluerer initialExpression og kopierer typede verdier til en ny QuestionnaireResponse (QR).
+/// Kunnskap om endepunkter og autentisering ligger i verten og datakildene.
+/// </summary>
 public sealed class PopulationEngine(IFhirDataSource source)
 {
     private readonly ExpressionEvaluator evaluator = new();
 
-    // Creates a NEW QR only. An existing/partly completed QR is deliberately not an input.
+    /// <summary>
+    /// Oppretter en ny QR uten å endre Q eller slå sammen tidligere svar. Avslått tilgang gir
+    /// et tomt skjemasvar uten kildekall; feil ved innhenting avbryter hele kjøringen.
+    /// </summary>
     public async Task<PopulationResult> CreateAsync(Questionnaire q, PopulationContext context,
         CancellationToken cancellationToken = default)
     {
@@ -33,7 +41,8 @@ public sealed class PopulationEngine(IFhirDataSource source)
         {
             ["patient"] = [(Patient)context.Patient.DeepCopy()]
         };
-        // Request-local only: never reuse this cache across patients, tenants or authorization contexts.
+        // Like søk gjenbrukes bare innen denne kjøringen. Del aldri denne cachen mellom
+        // pasienter, virksomheter eller tilgangskontekster.
         var cache = new Dictionary<string, Bundle>(StringComparer.Ordinal);
         scope = await BindAsync(q.Extension, qr, scope, context, cache, outcome, cancellationToken);
         qr.Item = await PopulateItemsAsync(q.Item, scope, context, cache, outcome, cancellationToken);
@@ -47,12 +56,14 @@ public sealed class PopulationEngine(IFhirDataSource source)
         return new(qr, outcome);
     }
 
+    // Hvert nivå arver variablene fra forelderen, men får sin egen navnetabell.
+    // En variabel i én gruppe skal ikke påvirke en søskengruppe.
     private async Task<Dictionary<string, Base[]>> BindAsync(IEnumerable<Extension> extensions,
         Base focus, Dictionary<string, Base[]> parent, PopulationContext context,
         Dictionary<string, Bundle> cache, OperationOutcome outcome, CancellationToken ct)
     {
         var scope = new Dictionary<string, Base[]>(parent);
-        // Extension order matters: a variable may use variables declared before it.
+        // Rekkefølgen i Q er viktig: et uttrykk kan bruke variabler som allerede er bundet.
         foreach (var ext in extensions.Where(e => e.Url == Sdc.Variable))
         {
             ct.ThrowIfCancellationRequested();
@@ -79,7 +90,7 @@ public sealed class PopulationEngine(IFhirDataSource source)
                     }
                     cache[query.RelativeUrl] = bundle;
                 }
-                // x-fhir-query binds a Bundle, not just entry.resource.
+                // Søkevariabelen inneholder hele Bundle. FHIRPath i Q velger deretter entry.resource.
                 values = [bundle];
             }
             else values = evaluator.Evaluate(focus, expression.Expression_!, scope);
@@ -88,6 +99,8 @@ public sealed class PopulationEngine(IFhirDataSource source)
         return scope;
     }
 
+    // Går gjennom skjemaets tre og bevarer linkId for koblingen mellom spørsmål og svar.
+    // Tvetydige enkeltverdier og feil datatype gir tomt felt med merknad; andre feil avbryter.
     private async Task<List<QuestionnaireResponse.ItemComponent>> PopulateItemsAsync(
         IEnumerable<Questionnaire.ItemComponent> questions, Dictionary<string, Base[]> parent,
         PopulationContext context, Dictionary<string, Bundle> cache,
@@ -119,7 +132,7 @@ public sealed class PopulationEngine(IFhirDataSource source)
                 {
                     try
                     {
-                        // Materialize first: a conversion failure must not leave half an answer collection.
+                        // Kontroller alle verdier før tildeling, så feltet aldri får en halv svarliste.
                         var mapped = values.Select(v => AnswerMapper.Map(question.Type, v)).ToArray();
                         item.Answer = mapped.Select(v =>
                             new QuestionnaireResponse.AnswerComponent { Value = v }).ToList();
@@ -135,6 +148,7 @@ public sealed class PopulationEngine(IFhirDataSource source)
         return items;
     }
 
+    // Bevarer grupper og spørsmål for manuell utfylling, uten å evaluere uttrykk eller initialverdier.
     private static List<QuestionnaireResponse.ItemComponent> Skeleton(
         IEnumerable<Questionnaire.ItemComponent> questions) => questions
         .Where(q => q.Type != QType.Display)
@@ -150,7 +164,7 @@ public sealed class PopulationEngine(IFhirDataSource source)
             Severity = OperationOutcome.IssueSeverity.Warning,
             Code = OperationOutcome.IssueType.Processing,
             Details = new CodeableConcept { Text = message },
-            // linkId is form metadata, not an FHIRPath issue.expression.
+            // linkId er skjemametadata og skal ikke tolkes som et FHIRPath-uttrykk i issue.expression.
             Diagnostics = linkId is null ? null : "linkId=" + linkId
         });
 }

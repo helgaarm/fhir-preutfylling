@@ -5,10 +5,14 @@ using QType = Hl7.Fhir.Model.Questionnaire.QuestionnaireItemType;
 
 namespace GenericPopulation;
 
-// No test framework dependency. Run: dotnet run -- --self-test
-// Includes regression tests from the supplied reference and new HTTP read tests.
+/// <summary>
+/// Lokale regresjonstester for motor, skjema-/søkegrenser og HTTP-klienter, inkludert DhgSelfTests.
+/// Bruker syntetiske filer og falske HTTP-svar uten eksterne kall eller eget testbibliotek.
+/// Kjør fra prosjektet med dotnet run -- --self-test.
+/// </summary>
 public static class SelfTests
 {
+    /// <summary>Kjører navngitte testtilfeller og returnerer prosesskode 0 ved suksess, ellers 1 for CI.</summary>
     public static async Task<int> RunAsync()
     {
         var cases = new List<(string, Func<SysTask>)>
@@ -230,6 +234,7 @@ public static class SelfTests
                 Check(result.Outcome.Issue.Count > 0, "OperationOutcome.issue 1..*");
             })
         };
+        cases.AddRange(DhgSelfTests.Cases());
         var failed = 0;
         foreach (var (name, test) in cases)
         {
@@ -240,6 +245,7 @@ public static class SelfTests
         return failed == 0 ? 0 : 1;
     }
 
+    // Felles hjelpere lager isolerte testkjøringer og finner svar via linkId, uavhengig av gruppenivå.
     private static PopulationContext Context(bool allowed = true) => new(DemoFiles.Patient(), allowed);
     private static Task<PopulationResult> Run(string name) =>
         new PopulationEngine(new FixtureDataSource(DemoFiles.Resources())).CreateAsync(DemoFiles.Questionnaire(name), Context());
@@ -263,12 +269,14 @@ public static class SelfTests
         catch (PopulationException e) when (e.Code == code) { return; }
         throw new InvalidOperationException("Expected " + code);
     }
+    // Bekrefter at også neste side i et søk går gjennom autorisasjon.
     private sealed class CountingAuthorizer : IRequestAuthorizer
     {
         public int Count { get; private set; }
         public SysTask AuthorizeAsync(HttpRequestMessage request, PopulationContext context, CancellationToken ct)
         { Count++; return SysTask.CompletedTask; }
     }
+    // Erstatter nettverket med en kø av FHIR-sider, men lar den virkelige GET-klienten behandle svarene.
     private sealed class QueueHandler(params Resource[] pages) : HttpMessageHandler
     {
         private readonly Queue<Resource> queue = new(pages);

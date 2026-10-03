@@ -1,15 +1,21 @@
 using System.Net.Http.Headers;
 using Hl7.Fhir.Model;
-using Hl7.Fhir.Serialization;
 
 namespace GenericPopulation;
 
+/// <summary>
+/// Adapter for FHIR-kilder med GET-oppslag og GET-søk. Samler sider til ett Bundle og
+/// kontrollerer destinasjon, pasient og resultatgrenser før motoren får dataene.
+/// Verten deler HttpClient, men oppretter en ny adapter per preutfylling og slår av omdirigeringer.
+/// </summary>
 public sealed class HttpFhirDataSource(
-    HttpClient client, Uri baseUri, IRequestAuthorizer authorizer) : IFhirDataSource
+    HttpClient client, Uri baseUri, IRequestAuthorizer authorizer) : IPatientFhirDataSource
 {
-    private const int MaxPages = 20, MaxEntries = 2000, MaxBytes = 2 * 1024 * 1024;
+    private const int MaxPages = 20, MaxEntries = 2000;
+    /// <inheritdoc />
     public int RequestCount { get; private set; }
 
+    /// <summary>Leser Patient/{id} og kontrollerer at svaret har den forespurte logiske ID-en.</summary>
     public async Task<Patient> ReadPatientAsync(string patientId, CancellationToken ct)
     {
         if (!System.Text.RegularExpressions.Regex.IsMatch(patientId, @"\A[A-Za-z0-9\-.]{1,64}\z"))
@@ -21,11 +27,13 @@ public sealed class HttpFhirDataSource(
         return patient;
     }
 
+    /// <summary>Henter alle tillatte sider fra et validert søk; feil avbryter uten delresultat.</summary>
     public async Task<Bundle> SearchAsync(FhirSearch search, PopulationContext context, CancellationToken ct)
     {
         if (!baseUri.AbsolutePath.EndsWith('/'))
             throw new PopulationException("configuration", "FHIR base URL må ende med skråstrek.");
         var merged = new Bundle { Type = Bundle.BundleType.Searchset };
+        // En feilaktig next-lenke må verken gi en uendelig løkke eller ubegrenset minnebruk.
         var visited = new HashSet<string>();
         Uri? next = new(baseUri, search.RelativeUrl);
         for (var page = 0; next is not null; page++)
@@ -55,6 +63,8 @@ public sealed class HttpFhirDataSource(
         return merged;
     }
 
+    // Kontroller destinasjonen før autorisasjon legges på. Dette gjelder også next-lenker fra kilden,
+    // slik at et token ikke sendes videre til en annen vert eller en annen del av samme server.
     private async Task<Resource> GetAsync(Uri uri, PopulationContext context, CancellationToken ct)
     {
         AssertDestination(uri);
@@ -64,19 +74,10 @@ public sealed class HttpFhirDataSource(
         await authorizer.AuthorizeAsync(request, context, ct);
         RequestCount++;
         using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
-        if (!response.IsSuccessStatusCode)
-            throw new PopulationException("source-http", "FHIR-kilden svarte med HTTP " + (int)response.StatusCode + ". Kontroller kilde, tilgang og pasient-ID.");
-        if (response.Content.Headers.ContentType?.MediaType is not ("application/fhir+json" or "application/json"))
-            throw new PopulationException("source-content", "Uventet innholdstype fra FHIR-kilden.");
-        var json = await ReadBoundedAsync(response.Content, ct);
-        Resource resource;
-        try { resource = new FhirJsonDeserializer().Deserialize<Resource>(json); }
-        catch (Exception) { throw new PopulationException("source-json", "Ugyldig FHIR JSON fra datakilden."); }
-        if (resource is OperationOutcome)
-            throw new PopulationException("source-outcome", "FHIR-kilden returnerte OperationOutcome i stedet for de forespurte dataene.");
-        return resource;
+        return await FhirHttpResponse.ReadAsync(response, ct);
     }
 
+    // Samme protokoll, vert, port og basesti som den serverkonfigurerte FHIR-kilden.
     private void AssertDestination(Uri uri)
     {
         if ((!uri.IsLoopback && uri.Scheme != "https") ||
@@ -86,26 +87,12 @@ public sealed class HttpFhirDataSource(
             throw new PopulationException("destination-policy", "FHIR-kallet peker utenfor godkjent endepunkt.");
     }
 
-    private static async Task<string> ReadBoundedAsync(HttpContent content, CancellationToken ct)
-    {
-        if (content.Headers.ContentLength > MaxBytes)
-            throw new PopulationException("response-size", "Datakildens svar er for stort.");
-        await using var stream = await content.ReadAsStreamAsync(ct);
-        using var memory = new MemoryStream();
-        var buffer = new byte[16 * 1024];
-        int read;
-        while ((read = await stream.ReadAsync(buffer.AsMemory(), ct)) != 0)
-        {
-            if (memory.Length + read > MaxBytes)
-                throw new PopulationException("response-size", "Datakildens svar er for stort.");
-            await memory.WriteAsync(buffer.AsMemory(0, read), ct);
-        }
-        return System.Text.Encoding.UTF8.GetString(memory.ToArray());
-    }
 }
 
+/// <summary>Autorisasjonsadapter for lokale syntetiske tester; tillater bare loopback.</summary>
 public sealed class LocalDemoAuthorizer : IRequestAuthorizer
 {
+    /// <inheritdoc />
     public SysTask AuthorizeAsync(HttpRequestMessage request, PopulationContext context, CancellationToken ct)
     {
         if (request.RequestUri is null || !request.RequestUri.IsLoopback || !context.PrepopulationAllowed)

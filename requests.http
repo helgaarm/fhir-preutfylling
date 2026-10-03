@@ -18,3 +18,13 @@ Content-Type: application/json
 ### Syntetisk Patient
 GET {{base}}/demo/fhir/Patient/demo-patient
 Accept: application/fhir+json
+
+### DHG Test: eksempelskjema (ingen eksterne oppslag)
+GET {{base}}/api/examples/dhg
+
+### DHG Test: preutfyll fra dokumentert syntetisk testperson
+# Dette gjør fire POST-søk mot den konfigurerte DHG-testkilden.
+POST {{base}}/api/populate
+Content-Type: application/json
+
+< ./examples/populate-request-dhg.json

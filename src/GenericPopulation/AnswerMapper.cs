@@ -3,10 +3,14 @@ using QType = Hl7.Fhir.Model.Questionnaire.QuestionnaireItemType;
 
 namespace GenericPopulation;
 
+/// <summary>Kobler FHIR-verdier til spørsmålets svartype uten å tolke eller omregne innholdet.</summary>
 public static class AnswerMapper
 {
-    // Preserve the FHIR datatype. Do not infer booleans, strip units or coerce strings.
-    // Computed FHIRPath system values require an explicit adapter, not a blind cast.
+    /// <summary>
+    /// Returnerer en kopi ved støttet typekombinasjon; ellers kastes answer-type.
+    /// Bevarer false, tallet 0 og enheter. Quantity krever system og kode, uten comparator.
+    /// Beregnede FHIRPath-systemverdier trenger en eksplisitt adapter før de kan bli FHIR-svar.
+    /// </summary>
     public static DataType Map(QType? questionType, Base value)
     {
         DataType? answer = (questionType, value) switch

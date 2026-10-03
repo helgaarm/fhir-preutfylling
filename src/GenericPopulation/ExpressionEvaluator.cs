@@ -5,10 +5,16 @@ using Hl7.Fhir.Model;
 
 namespace GenericPopulation;
 
+/// <summary>
+/// Samler Firely SDKs FHIRPath-evaluering og variabelbinding på ett sted.
+/// Uttrykk leser allerede innhentede ressurser; nettverksoppslag håndteres av datakilden.
+/// </summary>
 public sealed class ExpressionEvaluator
 {
-    // Only trusted, publication-validated Questionnaires are accepted.
-    // These guards are not a sandbox for hostile arbitrary FHIRPath programs.
+    /// <summary>
+    /// Avviser uttrykk utenfor demoens profil. Q må være betrodd og validert ved publisering;
+    /// disse kontrollene utgjør ikke en sandkasse for vilkårlige, fiendtlige FHIRPath-programmer.
+    /// </summary>
     public static void Check(string text)
     {
         if (string.IsNullOrWhiteSpace(text) || text.Length > 4000 || !text.StartsWith('%'))
@@ -18,20 +24,24 @@ public sealed class ExpressionEvaluator
             throw new PopulationException("expression-policy", "Uttrykket bruker en ustøttet kontekst eller funksjon.");
     }
 
+    /// <summary>
+    /// Evaluerer mot et fokusobjekt med navngitte variabler (for eksempel %patient).
+    /// Resultatet er en samling: tomt betyr ingen verdi, flere elementer kan kreve et gjentatt svar.
+    /// </summary>
     public Base[] Evaluate(Base focus, string text, IReadOnlyDictionary<string, Base[]> scope)
     {
         Check(text);
         var evaluation = new FhirEvaluationContext();
         foreach (var (name, values) in scope)
             evaluation.Environment[name] = values.Select(v => v.ToPocoNode()).ToArray();
-        // No resolver, trace sink or outbound network is installed in FHIRPath.
+        // Ingen resolver eller trace-mottaker er installert; evalueringen skal ikke hente eller logge data.
         try
         {
             return focus.Select(text, evaluation).Where(v => v is not null).Cast<Base>().ToArray();
         }
         catch (Exception e) when (e is not PopulationException)
         {
-            // Never include raw SDK exceptions, expressions or patient data in the public error.
+            // SDK-feilen kan inneholde uttrykk eller pasientverdier og skal ikke vises direkte.
             throw new PopulationException("expression-evaluation", "FHIRPath-uttrykket kunne ikke evalueres.");
         }
     }

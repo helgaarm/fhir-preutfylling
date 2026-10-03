@@ -1,14 +1,14 @@
 # FHIR preutfylling — .NET/C# testapp
 
-[MIT-lisens](LICENSE) · [Sikkerhet og privat rapportering](SECURITY.md) · [Bidra](CONTRIBUTING.md)
+[MIT-lisens](LICENSE) · [Tredjepartsmerknader](THIRD-PARTY-NOTICES.md) · [Lisensgjennomgang](docs/LICENSE_REVIEW.md) · [Sikkerhet og privat rapportering](SECURITY.md) · [Bidra](CONTRIBUTING.md)
 
 En lokal fullstack-app som tar **FHIR R4 Questionnaire (Q)** som JSON, henter **Patient og relevante ressurser fra et FHIR-endepunkt**, evaluerer uttrykkene i Q og lager en **QuestionnaireResponse (QR)**. Bygger videre på den vedlagte arkitekturbeskrivelsen og C#-demokoden.
 
-Backend er ASP.NET Core / C# på **.NET 10**, med **Firely Hl7.Fhir.R4 6.6.0**. Frontend er HTML, CSS og JavaScript som serveres av samme app. Du trenger ikke Node, npm, database eller en ekstern FHIR-server for å prøve demoen.
+Backend er ASP.NET Core / C# på **.NET 9**, med **Firely Hl7.Fhir.R4 6.6.0**. Frontend er HTML, CSS og JavaScript som serveres av samme app. Du trenger ikke Node, npm, database eller en ekstern FHIR-server for å prøve demoen.
 
 ## Start i Visual Studio Code
 
-1. Installer [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0), [Visual Studio Code](https://code.visualstudio.com/) og den anbefalte **C# Dev Kit**-utvidelsen.
+1. Installer [.NET 9 SDK](https://dotnet.microsoft.com/download/dotnet/9.0) versjon **9.0.300 eller nyere i 9.0-serien** og eventuelt [Visual Studio Code](https://code.visualstudio.com/) med den anbefalte **C# Dev Kit**-utvidelsen. Dev Kit har [egne bruksvilkår](https://code.visualstudio.com/docs/csharp/cs-dev-kit-faq); terminalalternativet nedenfor trenger ikke utvidelsen.
 2. Pakk ut prosjektet og åpne **FhirPreutfylling.code-workspace**, eller åpne prosjektmappen med `code .`.
 3. Trykk **F5** og velg **FHIR preutfylling · web**. Prosjektet bygges og nettleseren åpnes på **http://127.0.0.1:5077**. Første bygg trenger tilgang til NuGet.
 4. Behold kilden **Lokal demo** og Patient-ID **demo-patient**. Klikk **Hent data og preutfyll**.
@@ -39,6 +39,10 @@ Webflyten gjør faktiske HTTP-kall også mot demoen. Svangerskapseksemplet gir *
 QR har versjonert `questionnaire`, `subject`, ny `id`, `authored`, korrekt `item`/`answer.value[x]` og status **in-progress**. Preutfylling er et forslag som skal kontrolleres, og gjør ikke besvarelsen automatisk `completed`. Nettleseren viser resultatet uten å lagre det; den er ikke en full skjemautfyller.
 
 ## Bruk din FHIR-testserver
+
+For DHG-fasaden er **DHG · Azure Test** allerede tilgjengelig i kildevalget. Velg kilden og en av de to godkjente syntetiske testpersonene; eksemplet **DHG – svangerskap og kontakter** lastes automatisk. Klikk **Hent data og preutfyll** for å gjøre oppslagene. Se [DHG-veiledningen](docs/DHG.md) for kontrakt, kjørbare eksempler og lokal testing uten eksterne kall.
+
+Andre FHIR-testservere med vanlig GET-kontrakt konfigureres slik:
 
 Legg til en kilde i `src/GenericPopulation/appsettings.json` og start appen på nytt:
 
@@ -74,7 +78,7 @@ dotnet run --project src/GenericPopulation
 
 `-MaskInput` krever PowerShell 7.1+. Ved F5 må miljøvariabelen være tilgjengelig for VS Code-prosessen; start eventuelt VS Code fra terminalen der variabelen er satt. Token legges på hvert HTTP-kall, også sidehenting. Utelat `BearerTokenEnvironmentVariable` for kilder uten autentisering. Ikke legg token i Q, frontend, kildekode eller `launch.json`.
 
-Kilder velges fra serverens konfigurasjon. Vilkårlige URL-er fra Q eller API-input godtas ikke. Det er ikke implementert OAuth-pålogging, tokenfornyelse, HelseID, DPoP, X-Patient-Context eller DHG-spesifikk `POST _search`. Slike kontrakter må implementeres i verten/autorisasjonsadapteren for aktuell kilde. Det er heller ingen automatisk kapabilitetsoppdagelse.
+Kilder velges fra serverens konfigurasjon. Vilkårlige URL-er fra Q eller API-input godtas ikke. DHG-testkilden bruker `POST _search` med `identifier`/`patient.identifier` i formkroppen. OAuth-pålogging, tokenfornyelse, STS, HelseID, DPoP og X-Patient-Context er ikke implementert; autentisert DHG krever en avtalt tilgangskontrakt og egen adapter. Det er heller ingen automatisk kapabilitetsoppdagelse.
 
 ## API
 
@@ -94,6 +98,8 @@ Kilder velges fra serverens konfigurasjon. Vilkårlige URL-er fra Q eller API-in
 ```
 
 Dette er et illustrert utdrag. En komplett kjørbar request ligger i **examples/populate-request.json**.
+
+For `sourceId: "dhg-test"` brukes `patientIdentifier` (godkjent syntetisk NIN som tekst) i stedet for `patientId`. Begge feltene samtidig avvises. Se **examples/populate-request-dhg.json**. Returnert QR bruker DHGs pseudonyme Patient-ID, og appen kopierer ikke NIN fra requesten til QR.
 
 Svaret er `application/fhir+json` med `resourceType: Parameters` og parameterne:
 
@@ -134,7 +140,7 @@ $r | ConvertTo-Json -Depth 100
 | Kontekst | Én SDC `launchContext`: `patient`, type `Patient` |
 | Variabler | Standard `variable`, på root/item, evaluert i angitt rekkefølge med nedarvet scope |
 | FHIR-søk | `application/x-fhir-query`; relative søk; kun `{{%patient.id}}` som malbinding |
-| Ressurser | Patient read; søk på Observation, Encounter, CareTeam |
+| Ressurser | Patient read (DHG: POST-søk); søk på Observation, Encounter, CareTeam |
 | Søkeparametere | Obligatorisk `patient`; i tillegg `code`, `category`, `date` for Observation |
 | Initialverdier | `text/fhirpath` via SDC `initialExpression`, eller statisk `initial.value[x]` |
 | Svar | boolean, integer, decimal, date, dateTime, time, string/text, uri, Quantity |
@@ -148,7 +154,7 @@ Eksemplenes kliniske koder og utvalgsregler ligger i Q, ikke i motoren. Flere li
 ## Prosjektstruktur
 
 ```text
-FhirPreutfylling.slnx          Solution for .NET 10 / VS Code
+FhirPreutfylling.slnx          Solution for .NET 9 / VS Code
 FhirPreutfylling.code-workspace
 .vscode/                      F5, build-task, self-test og utvidelser
 src/GenericPopulation/
@@ -158,11 +164,14 @@ src/GenericPopulation/
   QuestionnaireGuard.cs       Støtteprofil og strukturkontroller
   AnswerMapper.cs             Bevarer svarenes FHIR-datatyper
   HttpFhirDataSource.cs        Patient, søk, paginering og størrelsesgrenser
+  DhgFhirDataSource.cs         DHG POST-søk og kontroll av pasientreferanser
+  FhirHttpResponse.cs          Felles begrensning og validering av HTTP-svar
   FhirSourceOptions.cs        Kilderegister og bearer-tokenadapter
   FhirSearch.cs               Relativ query-binding og pasientkontroll
   RoutingFhirDataSource.cs    Gjenbrukbart register for flere kilder
   FixtureDataSource.cs        Syntetiske demoressurser
-  SelfTests.cs                27 selvtester uten ekstra testrammeverk
+  SelfTests.cs                Opprinnelige regresjonstester uten ekstra testrammeverk
+  DhgSelfTests.cs              DHG-kontrakt, pasientisolering og feiltilfeller
   wwwroot/                    Norsk, responsivt webgrensesnitt
 examples/                     Q-er, Patient, Observations og eksempelrequest
 verification/                 HTTP-/nettlesertester og testresultater
@@ -183,6 +192,13 @@ Med appen kjørende, i en annen terminal:
 python verification/http-smoke.py
 ```
 
+DHG-kontrakten testes med en lokal syntetisk server. Testen starter og stopper appen selv på egne porter og gjør ingen eksterne kall:
+
+```sh
+dotnet publish src/GenericPopulation -c Release -o publish
+python verification/dhg-http-smoke.py --app-dir publish
+```
+
 Valgfri nettlesertest (Python og Playwright kreves bare til denne testen):
 
 ```sh
@@ -197,6 +213,7 @@ CLI med fixtures direkte, uten HTTP:
 dotnet run --project src/GenericPopulation -- --demo pregnancy
 dotnet run --project src/GenericPopulation -- --demo general
 dotnet run --project src/GenericPopulation -- --demo pregnancy --no-consent
+dotnet run --project src/GenericPopulation -- --demo dhg
 ```
 
 CLI skriver syntetisk QR og Outcome til `output/`. `--no-consent` er et historisk demoflagg fra referansekoden som simulerer avslag på preutfylling; det er ikke en faktisk samtykkemekanisme.
@@ -207,7 +224,7 @@ cd publish
 dotnet GenericPopulation.dll
 ```
 
-Publisert app kjøres fra `publish` slik at appsettings og wwwroot blir funnet. .NET 10 ASP.NET Core Runtime kreves. Porten endres med `Demo:Port`; oppdater også demokildens `BaseUrl` og eventuell `applicationUrl` i launchSettings.
+Publisert app kjøres fra `publish` slik at appsettings og wwwroot blir funnet. .NET 9 ASP.NET Core Runtime kreves. Porten endres med `Demo:Port`; oppdater også demokildens `BaseUrl` og eventuell `applicationUrl` i launchSettings.
 
 ## Avgrensning og verifikasjon
 
@@ -215,11 +232,15 @@ Dette er en lokal utviklerapp for **syntetiske/testdata og betrodde Q-definisjon
 
 Grenser: 256 KiB API-request, 240 KiB opplastet Q, 200 items, 12 gruppenivåer, 4 000 tegn per FHIRPath, 20 sider per søk, 2 000 ressurser per søk og 2 MiB per kilderespons. HTTP-kall har 20 sekunders tidsgrense, og en operasjon har 60 sekunders kanselleringsfrist.
 
-Bygg, selvtester, HTTP- og nettleserflyt er kjørt i leveransemiljøet. Se **verification/RESULTATER.md**. Ingen faktisk ekstern klinisk FHIR-kilde var oppgitt; tilkobling til din server og dens tilgangsmodell må verifiseres der. Demoen er ikke produksjonsklar og skriver ikke tilbake til FHIR-kilden.
+Bygg, selvtester, HTTP- og nettleserflyt er kontrollert. DHG Test er også verifisert med én preutfylling for hver av de to dokumenterte syntetiske testpersonene. Se **verification/RESULTATER.md**. Autentisert klinisk FHIR-tilgang er ikke verifisert; tilkobling til andre servere og deres tilgangsmodell må testes separat. Demoen er ikke produksjonsklar og skriver ikke tilbake til FHIR-kilden.
 
 ## Lisens og sikkerhet i det offentlige repoet
 
-Prosjektets kode og dokumentasjon er utgitt under [MIT-lisensen](LICENSE), copyright 2026 Armann Helgason. Du kan bruke, endre og distribuere prosjektet etter lisensvilkårene, og må beholde lisens- og copyrightteksten. Avhengigheter, blant annet Firely SDK, beholder sine egne lisenser. MIT gir ingen garanti eller klinisk godkjenning.
+Prosjektets egen kode og dokumentasjon er utgitt under [MIT-lisensen](LICENSE), copyright 2026 Armann Helgason. Behold lisens- og copyrightteksten ved videreformidling. De låste NuGet-pakkene er under MIT/BSD-3-Clause og beholder sine egne merknader. LOINC, UCUM og SNOMED CT i eksemplene har egne vilkår; MIT gir ingen terminologilisens, garanti eller klinisk godkjenning.
+
+[Tredjepartsmerknadene](THIRD-PARTY-NOTICES.md), [lisensgjennomgangen](docs/LICENSE_REVIEW.md) og [opprinnelsesoversikten](docs/PROVENANCE.md) beskriver kravene, eierens rettighetsbekreftelse og gjenstående bruksspesifikke avklaringer. SNOMED CT-bruk og videreformidling må ha relevant lisensgrunnlag. Originale lisenstekster ligger i [LICENSES/](LICENSES/); de følger normal build/publish og kan leses via **Lisenser** i appens bunntekst. Behold disse filene når appen pakkes videre.
+
+Kontroller lisensoversikten med `python scripts/check-licenses.py` etter restore, og med `python scripts/check-licenses.py --publish-dir publish` etter publisering. CI kjører begge kontrollene. Ved nye pakker eller versjoner må lisensoversikten oppdateres etter manuell vurdering.
 
 Repoet har konfigurasjon for CI, CodeQL, Gitleaks, Dependency Review og ukentlige Dependabot-oppdateringer. NuGet-avhengigheter er låst i `packages.lock.json`. CI bruker `dotnet restore --locked-mode` og avviser audit-advarsler også for transitive pakker. Actions bruker faste commit-ID-er og minimale tokenrettigheter.
 

@@ -32,15 +32,21 @@ jobs:
       - name: Set up .NET
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
-          dotnet-version: 10.0.x
+          dotnet-version: 9.0.x
       - name: Restore locked dependencies and audit all packages
         run: dotnet restore --locked-mode
+      - name: Verify reviewed licenses and notice integrity
+        run: python3 scripts/check-licenses.py
+      - name: Test license verification failure cases
+        run: python3 verification/license-check-tests.py
       - name: Build without warnings
         run: dotnet build --configuration Release --no-restore --warnaserror
       - name: Run C# regression tests
         run: dotnet run --project src/GenericPopulation --configuration Release --no-build -- --self-test
       - name: Publish
         run: dotnet publish src/GenericPopulation --configuration Release --no-build --output publish
+      - name: Verify distributed license documentation
+        run: python3 scripts/check-licenses.py --publish-dir publish
       - name: Run HTTP regression tests against published app
         shell: bash
         run: |
@@ -66,6 +72,8 @@ jobs:
             exit 1
           fi
           python3 verification/http-smoke.py
+      - name: Run DHG contract regression tests with synthetic upstream
+        run: python3 verification/dhg-http-smoke.py --app-dir publish
 
   workflow-lint:
     name: Workflow lint

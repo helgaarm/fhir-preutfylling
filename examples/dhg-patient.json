@@ -1,0 +1,15 @@
+{
+  "resourceType": "Patient",
+  "id": "dhg-synthetic-a",
+  "name": [
+    {
+      "text": "Syntetisk DHG-eksempel"
+    }
+  ],
+  "extension": [
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/patient-interpreterRequired",
+      "valueBoolean": false
+    }
+  ]
+}

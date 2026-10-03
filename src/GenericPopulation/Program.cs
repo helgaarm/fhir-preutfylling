@@ -1,9 +1,14 @@
 using System.Text.Json;
-using System.Text.RegularExpressions;
 using GenericPopulation;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
 
+// Startpunkt og HTTP-vert for den lokale utviklerappen.
+// Leseflyt: input -> QuestionnaireGuard -> kildeadapter/Patient -> PopulationEngine -> ny QR.
+// Motoren tolker skjemaet; datakildene håndterer transport; wwwroot viser resultat og merknader.
+// appsettings.json velger kilder, og examples/ viser hvordan Q uttrykker databehovet.
+
+// Kommandolinjemodusene bruker syntetiske data uten å starte webserver eller kalle DHG Test.
 if (args.Contains("--self-test"))
 {
     Environment.ExitCode = await SelfTests.RunAsync();
@@ -11,9 +16,9 @@ if (args.Contains("--self-test"))
 }
 if (args.Contains("--demo"))
 {
-    var name = args.Contains("general") ? "general" : "pregnancy";
-    var result = await new PopulationEngine(new FixtureDataSource(DemoFiles.Resources()))
-        .CreateAsync(DemoFiles.Questionnaire(name), new PopulationContext(DemoFiles.Patient(), !args.Contains("--no-consent")));
+    var name = args.Contains("dhg") ? "dhg" : args.Contains("general") ? "general" : "pregnancy";
+    var result = await new PopulationEngine(new FixtureDataSource(name == "dhg" ? DemoFiles.DhgResources() : DemoFiles.Resources()))
+        .CreateAsync(DemoFiles.Questionnaire(name), new PopulationContext(name == "dhg" ? DemoFiles.DhgPatient() : DemoFiles.Patient(), !args.Contains("--no-consent")));
     Directory.CreateDirectory("output");
     await File.WriteAllTextAsync("output/questionnaire-response.json", Json(result.Response));
     await File.WriteAllTextAsync("output/population-outcome.json", Json(result.Outcome));
@@ -21,22 +26,27 @@ if (args.Contains("--demo"))
     return;
 }
 
+// Oppstart: valider serverstyrte kilder før appen tar imot forespørsler.
 var builder = WebApplication.CreateBuilder(args);
 var port = builder.Configuration.GetValue("Demo:Port", 5077);
-// This is a local developer workbench, not a public clinical service.
+// Loopback-begrensningen gjelder utviklerappen; klinisk drift krever en egen tilgangsgrense.
 var address = $"http://127.0.0.1:{port}";
 builder.WebHost.UseUrls(address);
 builder.WebHost.ConfigureKestrel(options => options.Limits.MaxRequestBodySize = 256 * 1024);
-builder.Logging.ClearProviders(); // Do not log clinical payloads, query strings or tokens.
+// Unngå standardlogging av kliniske data, søkestrenger og token i denne testverten.
+builder.Logging.ClearProviders();
 var sources = builder.Configuration.GetSection("Fhir:Sources").Get<List<FhirSourceOptions>>() ?? [];
 if (sources.Count == 0 || sources.Select(s => s.Id).Distinct().Count() != sources.Count)
     throw new InvalidOperationException("Konfigurer Fhir:Sources med unike ID-er i appsettings.json.");
 foreach (var source in sources) source.Validate();
 var app = builder.Build();
-// Reuse connections; expression scope and search cache remain request-local.
+// Del forbindelser, men ikke pasientkontekst eller søkecache. Ingen automatiske omdirigeringer
+// eller cookies: kildesvar skal ikke kunne flytte et kall med tilgangs- eller pasientinformasjon.
 using var http = new HttpClient(new HttpClientHandler { AllowAutoRedirect = false, UseCookies = false })
     { Timeout = TimeSpan.FromSeconds(20) };
 
+// Felles HTTP-grense: unngå caching, begrens nettleseropprinnelse og oversett feil til
+// kontrollerte OperationOutcome-svar. Rå unntak og feilkropper fra kilden skal ikke sendes videre.
 app.Use(async (context, next) =>
 {
     context.Response.Headers.CacheControl = "no-store";
@@ -74,15 +84,25 @@ app.Use(async (context, next) =>
 
 app.UseDefaultFiles();
 app.UseStaticFiles();
+// Eksponer bare feltene grensesnittet trenger. Token og token-miljøvariabel sendes ikke til klienten.
 app.MapGet("/api/config", () => Results.Json(new
 {
-    sources = sources.Select(s => new { s.Id, s.Name, s.BaseUrl }),
+    sources = sources.Select(s => new
+    {
+        s.Id, s.Name, s.BaseUrl,
+        patientInput = s.IsDhg ? "identifier" : "id",
+        testPatientIdentifiers = s.IsDhg ? s.AllowedTestPatientIdentifiers : [],
+        defaultExample = s.IsDhg ? "dhg" : "pregnancy"
+    }),
     defaultPatientId = "demo-patient", fhirVersion = "4.0.1"
 }));
 app.MapGet("/api/examples/{scenario}", (string scenario) => Fhir(DemoFiles.Questionnaire(scenario)));
 app.MapGet("/health", () => Results.Json(new { status = "ok" }));
+// Offentlige lisensfiler fra appens distribusjon, uten pasientdata eller brukerbestemte filstier.
+// Tekstformat bevarer den originale juridiske ordlyden uten å tolke den som HTML.
+app.MapGet("/licenses", () => Results.Text(LicenseText(), "text/plain; charset=utf-8"));
 
-// Called through HTTP by the same client that accesses external FHIR sources.
+// Lokal syntetisk FHIR-kilde: demoen går gjennom samme GET-klient og HTTP-kontroller som eksterne kilder.
 app.MapGet("/demo/fhir/Patient/{id}", (string id) => id == "demo-patient"
     ? Fhir(DemoFiles.Patient())
     : Fhir(Outcome("not-found", "Fant ikke syntetisk pasient. Bruk demo-patient."), 404));
@@ -92,11 +112,13 @@ app.MapGet("/demo/fhir/{resourceType}", async (string resourceType, HttpRequest 
     var search = FhirSearch.Parse(resourceType + request.QueryString.Value, context.Patient.Id!);
     return Fhir(await new FixtureDataSource(DemoFiles.Resources()).SearchAsync(search, context, ct));
 });
+// Samme behandling med to svarformater: Parameters med QR + merknader, eller bare QR.
 app.MapPost("/api/populate", (Func<HttpContext, Task<IResult>>)(context => Populate(context, false)));
 app.MapPost("/api/questionnaire-response", (Func<HttpContext, Task<IResult>>)(context => Populate(context, true)));
 
 async Task<IResult> Populate(HttpContext httpContext, bool responseOnly)
 {
+    // Én frist for hele innhentingen, koblet til at nettleseren kan avbryte forespørselen.
     if (!httpContext.Request.HasJsonContentType())
         return Fhir(Outcome("content-type", "Send JSON med Content-Type: application/json."), 415);
     using var deadline = CancellationTokenSource.CreateLinkedTokenSource(httpContext.RequestAborted);
@@ -106,24 +128,31 @@ async Task<IResult> Populate(HttpContext httpContext, bool responseOnly)
     var root = document.RootElement;
     if (root.ValueKind != JsonValueKind.Object ||
         !root.TryGetProperty("questionnaire", out var qJson) || qJson.ValueKind != JsonValueKind.Object ||
-        !root.TryGetProperty("sourceId", out var sourceId) || sourceId.ValueKind != JsonValueKind.String ||
-        !root.TryGetProperty("patientId", out var patientId) || patientId.ValueKind != JsonValueKind.String)
-        return Fhir(Outcome("input", "Input må ha questionnaire (Q-objekt), sourceId og patientId."), 400);
-    if (root.EnumerateObject().Any(p => p.Name is not ("questionnaire" or "sourceId" or "patientId")))
-        return Fhir(Outcome("input", "Ukjent inputfelt. En eksisterende QR, tilgangsflagg eller kilde-URL kan ikke sendes inn."), 400);
+        !root.TryGetProperty("sourceId", out var sourceId) || sourceId.ValueKind != JsonValueKind.String)
+        return Fhir(Outcome("input", "Input må ha questionnaire (Q-objekt), sourceId og pasientvalg for kilden."), 400);
+    // Kilden velges fra serverens register. Avvis ukjente/dupliserte felt og blanding av
+    // logisk Patient-ID og DHG-identifikator, slik at pasientvalget er entydig.
     var sourceOptions = sources.SingleOrDefault(s => s.Id == sourceId.GetString())
         ?? throw new PopulationException("source-id", "Velg en kilde som er konfigurert i appsettings.json.");
-    var id = patientId.GetString()!;
-    if (!Regex.IsMatch(id, @"\A[A-Za-z0-9\-.]{1,64}\z"))
-        throw new PopulationException("patient-context", "Ugyldig logisk FHIR Patient-ID.");
+    var patientField = sourceOptions.IsDhg ? "patientIdentifier" : "patientId";
+    if (!root.TryGetProperty(patientField, out var patientValue) || patientValue.ValueKind != JsonValueKind.String ||
+        root.EnumerateObject().Any(p => p.Name is not ("questionnaire" or "sourceId") && p.Name != patientField) ||
+        root.EnumerateObject().GroupBy(p => p.Name).Any(g => g.Count() != 1))
+        return Fhir(Outcome("input", "Send bare questionnaire, sourceId og " + patientField + " som tekst. Dupliserte felt er ikke tillatt."), 400);
+    var patientKey = patientValue.GetString()!;
+    sourceOptions.ValidatePatientKey(patientKey);
     Questionnaire q;
     try { q = new FhirJsonDeserializer().Deserialize<Questionnaire>(qJson.GetRawText()); }
     catch (Exception) { throw new PopulationException("questionnaire-json", "Input må være et gyldig FHIR R4 Questionnaire."); }
+    // Valider skjemaet før nettverkskall. Motoren validerer også for andre kallere, som CLI og tester.
     QuestionnaireGuard.Validate(q);
-    var source = new HttpFhirDataSource(http, sourceOptions.Validate(), new ConfiguredAuthorizer(sourceOptions));
-    // Local developer mode authorizes test patients. Replace this boundary with actual
-    // authentication and authorization before reusing the engine in a clinical service.
-    var patient = await source.ReadPatientAsync(id, ct);
+    // Adapteren lever bare i denne forespørselen; DHG lagrer NIN -> pseudonym Patient-ID her.
+    IPatientFhirDataSource source = sourceOptions.IsDhg
+        ? new DhgFhirDataSource(http, sourceOptions)
+        : new HttpFhirDataSource(http, sourceOptions.Validate(), new ConfiguredAuthorizer(sourceOptions));
+    // Utviklermodus tillater testpasienter. En klinisk vert må autentisere brukeren og avgjøre
+    // tilgang før innhenting og før den oppretter PopulationContext med PrepopulationAllowed=true.
+    var patient = await source.ReadPatientAsync(patientKey, ct);
     var result = await new PopulationEngine(source).CreateAsync(q, new PopulationContext(patient, true), ct);
     httpContext.Response.Headers["X-Fhir-Requests"] = source.RequestCount.ToString();
     if (responseOnly) return Fhir(result.Response);
@@ -139,7 +168,15 @@ async Task<IResult> Populate(HttpContext httpContext, bool responseOnly)
 app.Lifetime.ApplicationStarted.Register(() => Console.WriteLine($"FHIR preutfylling: {address}"));
 await app.RunAsync();
 
+// Bruk FHIR-serialisering for ressurser, slik at value[x], datoer og øvrig R4-struktur bevares.
 static string Json(Resource resource) => new FhirJsonSerializer().SerializeToString(resource, pretty: true);
+static string LicenseText()
+{
+    var folder = AppContext.BaseDirectory;
+    var files = new[] { Path.Combine(folder, "LICENSE"), Path.Combine(folder, "THIRD-PARTY-NOTICES.md") }
+        .Concat(Directory.EnumerateFiles(Path.Combine(folder, "LICENSES"), "*.txt").Order(StringComparer.Ordinal));
+    return string.Join("\n\n", files.Select(file => Path.GetFileName(file) + "\n\n" + File.ReadAllText(file)));
+}
 static IResult Fhir(Resource resource, int status = 200) => Results.Text(Json(resource), "application/fhir+json", statusCode: status);
 static OperationOutcome Outcome(string code, string message) => new()
 {
@@ -149,6 +186,7 @@ static OperationOutcome Outcome(string code, string message) => new()
         Details = new CodeableConcept { Text = message }, Diagnostics = code
     }]
 };
+// Skriv bare et feilsvar hvis forbindelsen fortsatt er åpen og svaret ikke allerede har startet.
 static async SysTask Error(HttpContext context, int status, string code, string message)
 {
     if (context.Response.HasStarted || context.RequestAborted.IsCancellationRequested) return;

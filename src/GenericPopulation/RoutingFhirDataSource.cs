@@ -2,12 +2,22 @@ using Hl7.Fhir.Model;
 
 namespace GenericPopulation;
 
-// This is a SERVER-SIDE registry, never an endpoint list supplied by an end user.
-// Logical data selectors may be resolved to different deployments without changing Q.
+/// <summary>
+/// Serverdefinert kobling fra ressurstype og valgfri eksakt code-verdi til en datakilde.
+/// Null ExactCode matcher alle koder for typen. Rutene skal ikke komme fra sluttbrukeren.
+/// </summary>
 public sealed record SourceRoute(string ResourceType, string? ExactCode, IFhirDataSource Source);
 
+/// <summary>
+/// Valgfritt utvidelsespunkt for å hente ulike ressurser fra ulike kilder uten å endre Q.
+/// Brukes i tester; webverten velger i dag én kilde per forespørsel direkte i Program.cs.
+/// </summary>
 public sealed class RoutingFhirDataSource(IReadOnlyList<SourceRoute> routes) : IFhirDataSource
 {
+    /// <summary>
+    /// Krever nøyaktig én match. En generell og en spesifikk rute som begge matcher gir feil;
+    /// rekkefølgen i registeret gir ingen prioritet eller automatisk reservekilde.
+    /// </summary>
     public Task<Bundle> SearchAsync(FhirSearch search, PopulationContext context, CancellationToken ct)
     {
         var matches = routes.Where(r => r.ResourceType == search.ResourceType &&

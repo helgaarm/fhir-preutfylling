@@ -1,15 +1,25 @@
-"""Optional UI tests: pip install playwright && python -m playwright install chromium."""
+"""Valgfrie Playwright-tester av brukerflyt, tastatur og layout med syntetiske data.
+
+Start appen først. FHIR_TEST_BASE_URL velger appadresse; FHIR_SCREENSHOT_DIR velger
+mappe for skjermbilder. PLAYWRIGHT_CHANNEL kan velge en installert nettleser, som msedge.
+Installer ellers Playwright/Chromium med pip install playwright og python -m playwright install chromium.
+DHG-testene aktiveres av dhg-http-smoke.py --browser mot en lokal testkilde.
+"""
 import json
+import os
 from pathlib import Path
 from playwright.sync_api import sync_playwright, expect
 
 ROOT = Path(__file__).resolve().parents[1]
+BASE = os.environ.get('FHIR_TEST_BASE_URL', 'http://127.0.0.1:5077')
+SCREENSHOTS = Path(os.environ.get('FHIR_SCREENSHOT_DIR', str(ROOT / 'verification')))
+SCREENSHOTS.mkdir(parents=True, exist_ok=True)
 with sync_playwright() as p:
-    browser = p.chromium.launch(headless=True, args=['--no-sandbox'])
+    browser = p.chromium.launch(headless=True, channel=os.environ.get('PLAYWRIGHT_CHANNEL') or None)
     page = browser.new_page(viewport={'width': 1440, 'height': 1100}, device_scale_factor=1)
     errors = []
     page.on('pageerror', lambda error: errors.append(str(error)))
-    page.goto('http://127.0.0.1:5077')
+    page.goto(BASE)
     expect(page.locator('#populate')).to_be_enabled()
     expect(page.locator('#q-info')).to_contain_text('6 spørsmål')
     page.locator('#populate').click()
@@ -18,7 +28,7 @@ with sync_playwright() as p:
     expect(page.locator('#requests')).to_have_text('3')
     expect(page.locator('#preview')).to_contain_text('210 dager')
     expect(page.locator('#preview')).to_contain_text('Ikke utfylt')
-    page.screenshot(path=str(ROOT / 'verification/app-desktop.png'), full_page=True)
+    page.screenshot(path=str(SCREENSHOTS / 'app-desktop.png'), full_page=True)
     with page.expect_download() as download:
         page.locator('#download').click()
     resource = json.loads(Path(download.value.path()).read_text())
@@ -47,8 +57,41 @@ with sync_playwright() as p:
     page.locator('#questionnaire').press('Control+Enter')
     expect(page.locator('#output-result')).to_be_visible()
     page.set_viewport_size({'width': 390, 'height': 844})
-    page.screenshot(path=str(ROOT / 'verification/app-mobile.png'), full_page=True)
+    page.screenshot(path=str(SCREENSHOTS / 'app-mobile.png'), full_page=True)
     assert page.evaluate('document.documentElement.scrollWidth <= window.innerWidth'), 'Mobile overflow'
+    # Only enabled by the local synthetic DHG harness; never contacts Azure in this test.
+    # Denne delen forutsetter DHG-testkilden fra dhg-http-smoke.py, ikke det eksterne testmiljøet.
+    if os.environ.get('FHIR_TEST_DHG_MOCK') == 'true':
+        page.set_viewport_size({'width': 1440, 'height': 1100})
+        page.locator('#source').select_option('dhg-test')
+        # An uploaded/custom questionnaire must survive a source switch.
+        expect(page.locator('#example')).to_have_value('custom')
+        page.locator('#example').select_option('dhg')
+        expect(page.locator('#patient')).to_be_hidden()
+        expect(page.locator('#test-patient')).to_be_visible()
+        expect(page.locator('#output-result')).to_be_hidden()
+        expect(page.locator('#populate')).to_be_enabled()
+        page.locator('#populate').click()
+        expect(page.locator('#output-result')).to_be_visible()
+        expect(page.locator('#requests')).to_have_text('4')
+        expect(page.locator('#preview')).to_contain_text('Syntetisk DHG-eksempel')
+        expect(page.locator('#preview')).to_contain_text('Nei (false)')
+        page.screenshot(path=str(SCREENSHOTS / 'dhg-desktop.png'), full_page=True)
+        page.locator('#test-patient').select_option('11859699482')
+        expect(page.locator('#output-result')).to_be_hidden()
+        page.locator('#populate').click()
+        expect(page.locator('#output-result')).to_be_visible()
+        expect(page.locator('#preview')).to_contain_text('Annen syntetisk testperson')
+        expect(page.locator('#preview')).not_to_contain_text('128 mmHg')
+        page.set_viewport_size({'width': 390, 'height': 844})
+        page.screenshot(path=str(SCREENSHOTS / 'dhg-mobile.png'), full_page=True)
+        assert page.evaluate('document.documentElement.scrollWidth <= window.innerWidth'), 'DHG mobile overflow'
+        page.locator('#source').select_option('demo')
+        expect(page.locator('#patient')).to_be_visible()
+        expect(page.locator('#test-patient')).to_be_hidden()
+        expect(page.locator('#example')).to_have_value('pregnancy')
+        expect(page.locator('#output-result')).to_be_hidden()
+        print('PASS: DHG source, synthetic patient selector, example, POST population, patient change and mobile layout.')
     assert not errors, errors
     browser.close()
 print('PASS: UI examples, HTTP population, false, repeated answers, file upload, invalid JSON, missing patient, tabs, keyboard, QR download and mobile layout. No JavaScript errors.')

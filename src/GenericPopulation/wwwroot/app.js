@@ -1,27 +1,62 @@
 'use strict';
+// Grensesnitt for den lokale testappen. All preutfylling og tilgangskontroll skjer på serveren;
+// nettleseren redigerer Q, sender pasientvalg og viser QR (QuestionnaireResponse) med merknader.
+// Resultater holdes i minnet; lagring skjer bare gjennom brukerens nedlasting eller kopiering.
 const $ = id => document.getElementById(id);
+// config kommer fra /api/config; envelope er Parameters med QR + OperationOutcome; qr er selve svaret.
 let config, envelope, qr, busy = false;
 const flatten = items => (items || []).flatMap(item => [item, ...flatten(item.item)]);
 const pretty = value => JSON.stringify(value, null, 2);
+const selectedSource = () => config?.sources.find(s => s.id === $('source').value);
+// GET-kilder bruker en logisk Patient-ID. DHG bruker en syntetisk identifikator fra serverens testliste.
+const isDhg = () => selectedSource()?.patientInput === 'identifier';
+const patientKey = () => isDhg() ? $('test-patient').value : $('patient').value.trim();
 function message(text, error = false) {
   $('message').textContent = text;
   $('message').classList.toggle('error', error);
   $('message').hidden = !text;
 }
+/** Fjern forrige resultat når kilde, pasient eller skjema endres, så gamle svar ikke vises som aktuelle. */
 function invalidate() {
   qr = envelope = null;
   $('output-result').hidden = true;
   $('output-empty').hidden = false;
   message('');
 }
+/** Lås input under asynkrone kall og velg mellom tom, ventende og ferdig resultatvisning. */
 function setBusy(value) {
   busy = value;
-  for (const id of ['populate', 'source', 'patient', 'example', 'upload', 'format', 'questionnaire']) $(id).disabled = value;
+  for (const id of ['populate', 'source', 'patient', 'test-patient', 'example', 'upload', 'format', 'questionnaire']) $(id).disabled = value;
   $('run-label').textContent = value ? 'Preutfyller …' : 'Hent data og preutfyll';
   $('output-loading').hidden = !value;
   $('output-empty').hidden = value || !!qr;
   $('output-result').hidden = value || !qr;
 }
+/** Tilpass pasientvelger og eksempel til kilden. Et eget redigert skjema beholdes ved kildebytte. */
+async function updateSource(loadDefaultExample = true) {
+  invalidate();
+  const source = selectedSource();
+  const dhg = isDhg();
+  $('endpoint').textContent = source?.baseUrl || '';
+  $('patient').hidden = dhg;
+  $('test-patient').hidden = !dhg;
+  $('patient-label').textContent = dhg ? 'Syntetisk testperson (NIN)' : 'Patient-ID';
+  $('patient-label').htmlFor = dhg ? 'test-patient' : 'patient';
+  $('patient-help').textContent = dhg
+    ? 'Bare godkjente syntetiske testpersoner. Oppslaget sendes til DHG Test når du trykker Hent data og preutfyll.'
+    : 'Logisk ressurs-ID, for eksempel demo-patient.';
+  $('test-patient').replaceChildren();
+  for (const [index, identifier] of (source?.testPatientIdentifiers || []).entries()) {
+    const option = element('option', '', `Testperson ${index + 1} · ${identifier}`);
+    option.value = identifier;
+    $('test-patient').append(option);
+  }
+  if (loadDefaultExample && $('example').value !== 'custom') {
+    $('example').value = source?.defaultExample || 'pregnancy';
+    await loadExample($('example').value);
+  }
+}
+// Spørsmålsantall og versjon er en forhåndsvisning; serverens QuestionnaireGuard avgjør hva som støttes.
 function updateInfo() {
   try {
     const q = JSON.parse($('questionnaire').value);
@@ -29,6 +64,7 @@ function updateInfo() {
     $('q-info').textContent = `${questions.length} spørsmål · versjon ${q.version || 'mangler'}`;
   } catch { $('q-info').textContent = 'JSON må være gyldig før preutfylling'; }
 }
+// Leser et lokalt Q-eksempel fra appen. Dette starter ingen oppslag hos en ekstern FHIR-kilde.
 async function loadExample(name) {
   invalidate(); setBusy(true);
   try {
@@ -39,6 +75,7 @@ async function loadExample(name) {
   } catch (error) { message(error.message, true); }
   finally { setBusy(false); }
 }
+/** Hold synlig panel, ARIA-valg og tastaturfokus samordnet for resultatfanene. */
 function selectTab(panel, focus = false) {
   for (const tab of document.querySelectorAll('.tab')) {
     const selected = tab.dataset.panel === panel;
@@ -49,12 +86,14 @@ function selectTab(panel, focus = false) {
     if (selected && focus) tab.focus();
   }
 }
+// Q- og FHIR-tekst settes med textContent, slik at data ikke blir tolket som HTML.
 function element(tag, className, text) {
   const node = document.createElement(tag);
   if (className) node.className = className;
   if (text !== undefined) node.textContent = text;
   return node;
 }
+/** Formater FHIR value[x] for visning uten å endre QR; false og 0 er gyldige svar. */
 function answerText(answer) {
   const key = Object.keys(answer).find(k => k.startsWith('value'));
   const value = answer[key];
@@ -63,6 +102,7 @@ function answerText(answer) {
   if (value !== null && typeof value === 'object') return pretty(value);
   return value == null ? '—' : String(value);
 }
+/** Følg QR-hierarkiet og bruk Qs linkId-kart for å skille grupper fra spørsmål. */
 function renderItems(items, parent, questionMap) {
   for (const item of items || []) {
     const question = questionMap.get(item.linkId);
@@ -79,6 +119,7 @@ function renderItems(items, parent, questionMap) {
     }
   }
 }
+/** Vis svaret som lesbare felt, original QR JSON og separate merknader fra OperationOutcome. */
 function showResult(questionnaire, elapsed, requestCount) {
   const issues = envelope.parameter.find(p => p.name === 'issues')?.resource?.issue || [];
   const questions = flatten(questionnaire.item).filter(i => !['group', 'display'].includes(i.type));
@@ -101,6 +142,7 @@ function showResult(questionnaire, elapsed, requestCount) {
   }
   selectTab('preview');
 }
+/** Valider enkel input, kall appens API og vis resultatet. Backend utfører alle FHIR-oppslag. */
 async function populate() {
   if (busy || !config) return;
   invalidate();
@@ -108,7 +150,10 @@ async function populate() {
   try {
     questionnaire = JSON.parse($('questionnaire').value);
     if (questionnaire.resourceType !== 'Questionnaire') throw new Error('Input må være et FHIR Questionnaire.');
-    if (!/^[A-Za-z0-9.-]{1,64}$/.test($('patient').value.trim())) throw new Error('Skriv inn en gyldig logisk Patient-ID.');
+    if (isDhg()) {
+      if (!/^[0-9]{11}$/.test(patientKey()) || !selectedSource().testPatientIdentifiers.includes(patientKey()))
+        throw new Error('Velg en godkjent syntetisk testperson for DHG.');
+    } else if (!/^[A-Za-z0-9.-]{1,64}$/.test(patientKey())) throw new Error('Skriv inn en gyldig logisk Patient-ID.');
   } catch (error) {
     message(error instanceof SyntaxError ? 'Ugyldig JSON. Kontroller komma, anførselstegn og parenteser i Questionnaire.' : error.message, true);
     return;
@@ -116,9 +161,11 @@ async function populate() {
   setBusy(true);
   const start = performance.now();
   try {
+    // Send identifikatoren i JSON-kroppen, aldri i URL-en. Kildeadresse og token velges av serveren.
+    // Nettleserfristen er litt lengre enn serverens 60 sekunder, så serverens feilsvar kan rekke frem.
     const response = await fetch('/api/populate', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ questionnaire, sourceId: $('source').value, patientId: $('patient').value.trim() }),
+      body: JSON.stringify({ questionnaire, sourceId: $('source').value, [isDhg() ? 'patientIdentifier' : 'patientId']: patientKey() }),
       signal: AbortSignal.timeout(65000)
     });
     const data = await response.json();
@@ -136,6 +183,7 @@ async function populate() {
     message(error.name === 'TimeoutError' ? 'Tidsgrensen ble overskredet. Kontroller FHIR-kilden og prøv igjen.' : error.message, true);
   } finally { setBusy(false); }
 }
+/** Lag en lokal JSON-nedlasting og frigjør den midlertidige objekt-URL-en etterpå. */
 function download(value, name) {
   if (!value) return;
   const url = URL.createObjectURL(new Blob([pretty(value)], { type: 'application/fhir+json' }));
@@ -143,11 +191,11 @@ function download(value, name) {
   document.body.append(link); link.click(); link.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
+// Brukerhandlinger: inputendringer ugyldiggjør resultatet; bare preutfyllingshandlingen henter FHIR-data.
 $('populate').addEventListener('click', populate);
-$('source').addEventListener('change', () => {
-  invalidate(); $('endpoint').textContent = config.sources.find(s => s.id === $('source').value)?.baseUrl || '';
-});
+$('source').addEventListener('change', () => updateSource());
 $('patient').addEventListener('input', invalidate);
+$('test-patient').addEventListener('change', invalidate);
 $('questionnaire').addEventListener('input', () => { invalidate(); $('example').value = 'custom'; updateInfo(); });
 $('example').addEventListener('change', () => loadExample($('example').value));
 $('format').addEventListener('click', () => {
@@ -183,6 +231,7 @@ $('copy').addEventListener('click', async () => {
 document.addEventListener('keydown', event => {
   if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') { event.preventDefault(); populate(); }
 });
+// Oppstart henter kildevalg og et eksempelskjema fra egen server. Ingen DHG-oppslag kjøres her.
 (async () => {
   try {
     const response = await fetch('/api/config');
@@ -191,8 +240,7 @@ document.addEventListener('keydown', event => {
     for (const source of config.sources) {
       const option = element('option', '', source.name); option.value = source.id; $('source').append(option);
     }
-    $('endpoint').textContent = config.sources[0].baseUrl;
     $('patient').value = config.defaultPatientId;
-    await loadExample('pregnancy');
+    await updateSource();
   } catch (error) { message('Kunne ikke starte appen: ' + error.message, true); }
 })();
