@@ -1,0 +1,10 @@
+**/bin/
+**/obj/
+output/
+*.user
+publish/
+appsettings.Local.json
+.env
+.env.*
+*.log
+__pycache__/
