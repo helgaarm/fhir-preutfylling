@@ -42,9 +42,22 @@ async def main():
             await expect(stale.locator('#cfg-Id')).to_have_value('demo')
             passed('Configuration page loads current settings and is linked from population page')
 
+            # Bare eksplisitt trykk tester den lagrede kilden; resultatet må ikke endre konfigurasjonen.
+            endpoint = page.locator('#config-endpoint-status')
+            await expect(endpoint.locator('.endpoint-status')).to_have_attribute('data-state', 'unknown')
+            await endpoint.get_by_role('button', name='Test tilkobling').click()
+            await expect(endpoint.locator('.endpoint-status')).to_have_attribute('data-state', 'ok')
+            await expect(endpoint.locator('.endpoint-check-info')).to_contain_text('FHIR R4-metadata er bekreftet')
+            await expect(endpoint.locator('.endpoint-check-info')).to_contain_text('Sjekket kl.')
+            assert (await (await context.request.get(BASE + '/api/configuration')).json()) == original
+            await expect(page.locator('#config-state')).to_have_text('Lagret')
+            passed('Manual source check reports reachable local endpoint without changing saved settings')
+
             # Uferdig JSON må bevares ved navigasjon og aldri føre til en serverendring.
             capabilities = await page.locator('#cfg-Capabilities').input_value()
             await page.locator('#cfg-Capabilities').fill('{invalid')
+            await expect(endpoint.get_by_role('button', name='Test tilkobling')).to_be_disabled()
+            await expect(endpoint.locator('.endpoint-status')).to_have_attribute('data-state', 'unknown')
             await page.locator('#config-save').click()
             await expect(page.locator('#config-message')).to_contain_text('ugyldig JSON')
             await page.locator('[data-kind=PopulationProfiles]').click()

@@ -39,11 +39,20 @@ if (builder.Configuration.GetSection("Fhir:Sources").GetChildren().Any(s => s["M
     throw new InvalidOperationException("Fhir:Sources:Mode er erstattet. Konfigurer SearchMethod, PatientLookup, PatientBinding og Capabilities eksplisitt.");
 var configurationStore = new FhirConfigurationStore(builder.Environment.ContentRootPath,
     builder.Configuration.GetSection("Fhir").Get<FhirConfiguration>() ?? new());
+// Ikke la en bakgrunnsprosess arve utviklingsmiljøets sperreproxy og fremstå som klar for eksterne kilder.
+try { NetworkStartupGuard.Validate(configurationStore.Current.Configuration.Sources, HttpClient.DefaultProxy); }
+catch (InvalidOperationException error)
+{
+    Console.Error.WriteLine(error.Message);
+    Environment.ExitCode = 1;
+    return;
+}
 var app = builder.Build();
 // Del forbindelser, men ikke pasientkontekst eller søkecache. Ingen automatiske omdirigeringer
 // eller cookies: kildesvar skal ikke kunne flytte et kall med tilgangs- eller pasientinformasjon.
 using var http = new HttpClient(new HttpClientHandler { AllowAutoRedirect = false, UseCookies = false })
     { Timeout = TimeSpan.FromSeconds(20) };
+var connectivity = new EndpointConnectivity(http);
 
 // Felles HTTP-grense: unngå caching, begrens nettleseropprinnelse og oversett feil til
 // kontrollerte OperationOutcome-svar. Rå unntak og feilkropper fra kilden skal ikke sendes videre.
@@ -120,11 +129,32 @@ app.MapGet("/api/config", () =>
 app.MapGet("/api/configuration", () => ConfigurationResult(configurationStore.Current));
 app.MapPost("/api/configuration/validate", (Func<HttpContext, Task<IResult>>)(context => EditConfiguration(context, false)));
 app.MapPost("/api/configuration", (Func<HttpContext, Task<IResult>>)(context => EditConfiguration(context, true)));
+app.MapPost("/api/sources/{sourceId}/status", async (string sourceId, HttpContext context) =>
+{
+    if (!context.Request.HasJsonContentType())
+        return Fhir(Outcome("content-type", "Send JSON med Content-Type: application/json."), 415);
+    using var document = await JsonDocument.ParseAsync(context.Request.Body, cancellationToken: context.RequestAborted);
+    var root = document.RootElement;
+    if (root.ValueKind != JsonValueKind.Object || root.EnumerateObject().Count() != 1 ||
+        !root.TryGetProperty("configurationRevision", out var revision) || revision.ValueKind != JsonValueKind.String)
+        return Fhir(Outcome("input", "Send bare configurationRevision fra den lastede konfigurasjonen."), 400);
+    var snapshot = configurationStore.Current;
+    if (revision.GetString() != snapshot.Revision)
+        return Fhir(Outcome("configuration-conflict", "Konfigurasjonen er endret. Last siden på nytt før du tester tilkoblingen."), 409);
+    var source = snapshot.Configuration.Sources.SingleOrDefault(s => s.Id == sourceId);
+    if (source is null) return Fhir(Outcome("source-id", "Velg en lagret FHIR-kilde."), 404);
+    var result = await connectivity.CheckAsync(source, context.RequestAborted);
+    if (configurationStore.Current.Revision != snapshot.Revision)
+        return Fhir(Outcome("configuration-conflict", "Konfigurasjonen ble endret under kontrollen. Last siden på nytt."), 409);
+    return Results.Json(result);
+});
 app.MapGet("/api/examples/{scenario}", (string scenario) => Fhir(DemoFiles.Questionnaire(scenario)));
 app.MapGet("/health", () => Results.Json(new { status = "ok" }));
 // Offentlige lisensfiler fra appens distribusjon, uten pasientdata eller brukerbestemte filstier.
 // Tekstformat bevarer den originale juridiske ordlyden uten å tolke den som HTML.
 app.MapGet("/licenses", () => Results.Text(LicenseText(), "text/plain; charset=utf-8"));
+app.MapGet("/demo/fhir/metadata", DemoMetadata);
+app.MapGet("/demo/vitals/metadata", DemoMetadata);
 
 // Lokal syntetisk FHIR-kilde: demoen går gjennom samme GET-klient og HTTP-kontroller som eksterne kilder.
 app.MapGet("/demo/fhir/Patient/{id}", (string id) => id == "demo-patient"
@@ -148,6 +178,13 @@ app.MapGet("/demo/vitals/Observation", async (HttpRequest request, CancellationT
 // Samme behandling med to svarformater: Parameters med QR + merknader, eller bare QR.
 app.MapPost("/api/populate", (Func<HttpContext, Task<IResult>>)(context => Populate(context, false)));
 app.MapPost("/api/questionnaire-response", (Func<HttpContext, Task<IResult>>)(context => Populate(context, true)));
+
+static IResult DemoMetadata() => Results.Json(new
+{
+    resourceType = "CapabilityStatement", status = "active", date = "2026-10-04", kind = "instance",
+    fhirVersion = "4.0.1", format = new[] { "application/fhir+json" },
+    implementation = new { description = "Lokal syntetisk FHIR-kilde for preutfyllingsdemoen." }
+}, contentType: "application/fhir+json");
 
 async Task<IResult> Populate(HttpContext httpContext, bool responseOnly)
 {

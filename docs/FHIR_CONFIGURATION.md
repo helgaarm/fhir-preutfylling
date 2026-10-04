@@ -11,7 +11,11 @@ Klikk **Konfigurasjon** i toppmenyen, eller åpne `/configuration.html`.
 3. **Skjemaer** kobler eksakt Questionnaire-URL og versjon til en profil. **Dupliser** lager et utgangspunkt for en ny versjon; fyll inn det tomme versjonsfeltet. Bryteren **Krev registrert Questionnaire-URL og versjon** styrer `RequireQuestionnaireBinding`.
 4. **Valider utkast** kontrollerer struktur og referanser uten å lagre, aktivere eller kontakte kildene. **Lagre og ta i bruk** validerer på nytt, lagrer og aktiverer hele oppsettet samlet. **Fjern fra utkast** får først virkning ved lagring; referanser til fjernede kilder/profiler må rettes før lagring godtas.
 
-Enkle verdier har egne felt. `PatientLookup`, `PatientBinding`, `Capabilities`, `Routes` og `QueryBindings` har JSON-felt med hjelpetekst og støtter feltene beskrevet nedenfor. **Last ned JSON** eksporterer hele utkastet, også ulagrede endringer, for sikkerhetskopi eller filbasert konfigurasjon. **Hent lagret** forkaster utkastet etter bekreftelse.
+Enkle verdier har egne felt. `PatientLookup`, `PatientBinding`, `Capabilities`, `Routes` og `QueryBindings` har JSON-felt med hjelpetekst og støtter feltene beskrevet nedenfor. **Vis JSON** åpner hele utkastet i et modalvindu for lesing, inkludert ulagrede endringer. Vinduet lagrer ingenting og lukkes med **Lukk** eller Escape. Ugyldig JSON i et redigeringsfelt må rettes før utkastet kan vises. **Last ned JSON** eksporterer hele utkastet, også ulagrede endringer, for sikkerhetskopi eller filbasert konfigurasjon. **Hent lagret** forkaster utkastet etter bekreftelse.
+
+**Test tilkobling** under Kilder kontrollerer `metadata` under den lagrede FHIR-baseadressen. Knappen er deaktivert mens utkastet har ulagrede endringer. Den samme kontrollen finnes ved hver kilde på preutfyllingssiden. Status vises med både farge og tekst: grønn når svaret er et `CapabilityStatement` for FHIR R4 (4.0.1), gul for avvist kontroll/tilgangskrav/omdirigering/uventet innhold, rød for nettverksfeil/tidsavbrudd/HTTP 5xx. HTTP 404/405 gir gul status fordi serveren svarer, men metadata ikke er tilgjengelige på adressen. Etter ett minutt blir statusen grå og kan testes på nytt. Ingen kontroller kjører automatisk.
+
+Kontrollen sender én anonym GET til `metadata`, uten token, pasientdata eller nye forsøk. Bare servermetadata leses, med en grense på 256 KiB og fem sekunders tidsfrist for hele svaret. Innholdstype, JSON, ressurstype og FHIR-versjon kontrolleres. Den bekrefter at serveren tilbyr FHIR R4-metadata, men tester ikke autentisert tilgang til pasientdata. En foreldet konfigurasjonsrevisjon avvises, slik at en gammel fane ikke tester endrede endepunkter i stillhet.
 
 ### Lagring og tilbakestilling
 
@@ -30,6 +34,7 @@ For å gå tilbake til appsettings/miljøvariabler: stopp appen, ta vare på den
 | `GET /api/configuration` | Returnerer `revision`, relativ lagringssti `storage` og full `configuration` med feltnavn som i appsettings. |
 | `POST /api/configuration/validate` | Tar `{ "revision": "...", "configuration": { ... } }`. Kontrollerer utkastet uten endringer. |
 | `POST /api/configuration` | Samme input; returnerer lagret konfigurasjon og ny revisjon. |
+| `POST /api/sources/{sourceId}/status` | Tar `{ "configurationRevision": "..." }` og tester én lagret kilde. Returnerer `state`, `label`, `detail`, `httpStatus` og `checkedAt`. Ukjent kilde gir 404, foreldet revisjon 409. Vilkårlige URL-er og ekstra inputfelt avvises. |
 
 POST krever `application/json` og følger samme loopback-, Host-, Origin- og størrelsesgrense som appen. Ukjente/dupliserte felt, ugyldige datatyper og brutte referanser avvises. Konflikt gir HTTP 409; skrivefeil gir kontrollert HTTP 500 uten å endre aktivt oppsett. Ingen FHIR-kall gjøres under validering eller lagring. Dette er administrasjon av den lokale utviklerappen, med samme lokale tilgang som resten av appen.
 

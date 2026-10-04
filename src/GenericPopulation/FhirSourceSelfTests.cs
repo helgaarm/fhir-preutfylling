@@ -7,22 +7,26 @@ using Microsoft.AspNetCore.WebUtilities;
 namespace GenericPopulation;
 
 /// <summary>
-/// Tester DHG-konfigurasjonens POST-kontrakt, pasientisolasjon og feilgrenser med syntetiske HTTP-svar.
-/// Kjøres som del av SelfTests; ingen forespørsler når det eksterne DHG-endepunktet.
+/// Tester generiske konfigurasjonsvalg, pasientisolasjon og feilgrenser med syntetiske HTTP-svar.
+/// Ingen leverandørkonfigurasjon, eksempelskjemaer eller eksterne tjenester brukes.
 /// </summary>
-internal static class DhgSelfTests
+internal static class FhirSourceSelfTests
 {
-    private const string TestIdentifier = "29760484634";
-    // Samme konfigurasjon som appen, men testene sender bare til en lokal HttpMessageHandler.
-    internal static FhirSourceOptions Options()
+    private const string TestIdentifier = "TEST-001";
+    // Minimalt testoppsett. Hvert testtilfelle setter bare begrensningene det skal verifisere.
+    private static FhirSourceOptions Options() => new()
     {
-        var options = new ConfigurationBuilder().SetBasePath(AppContext.BaseDirectory)
-            .AddJsonFile("appsettings.json").Build().GetSection("Fhir:Sources").Get<List<FhirSourceOptions>>()!
-            .Single(s => s.Id == "dhg-test");
-        options.BaseUrl = "https://dhg.example/fhir/";
-        options.AllowedTestPatientIdentifiers.Add("00000000001");
-        return options;
-    }
+        Id = "test-source", Name = "Syntetisk kilde", BaseUrl = "https://source.example/fhir/",
+        SearchMethod = "POST", PatientLookup = new() { Interaction = "search" },
+        PatientBinding = new() { Parameter = "subject.identifier", ValueFrom = "inputIdentifier" }
+    };
+    private static Patient Patient() => new() { Id = "synthetic-patient", Active = true };
+    private static Encounter Encounter(string patientId = "synthetic-patient") => new()
+    {
+        Id = "synthetic-encounter", Status = Hl7.Fhir.Model.Encounter.EncounterStatus.Finished,
+        Class = new Coding("http://terminology.hl7.org/CodeSystem/v3-ActCode", "AMB"),
+        Subject = new("Patient/" + patientId)
+    };
     private static Bundle BundleOf(params Resource[] resources) => new()
     {
         Type = Bundle.BundleType.Searchset, Total = resources.Length,
@@ -35,120 +39,119 @@ internal static class DhgSelfTests
     private static FhirSearch Search(Patient patient, string suffix = "", string resource = "Observation") =>
         FhirSearch.Parse(resource + "?patient=" + patient.Id + suffix, patient.Id!);
 
-    /// <summary>Testtilfeller for både full Q-til-QR-flyt og avvisning av utrygge eller ufullstendige svar.</summary>
+    /// <summary>Testtilfeller for konfigurert transport og avvisning av utrygge eller ufullstendige svar.</summary>
     public static IEnumerable<(string, Func<SysTask>)> Cases() =>
     [
-        ("DHG: full Q-flyt med fire POST-kall og pseudonym QR", async () =>
+        ("FHIR-kilde: GET og POST bruker konfigurerte pasientparametere", async () =>
         {
-            var resources = DemoFiles.DhgResources();
-            var q = DemoFiles.Questionnaire("dhg");
-            // Like spørringer i samme kjøring skal treffe motorens cache, ikke lese DHG på nytt.
-            q.Extension.Add(new Extension(Sdc.Variable, new Expression
-            { Name = "sameObservations", Language = "application/x-fhir-query", Expression_ = "Observation?patient={{%patient.id}}" }));
-            using var handler = new Handler(Reply(BundleOf(DemoFiles.DhgPatient())),
-                Reply(BundleOf(resources.OfType<Observation>().ToArray())),
-                Reply(BundleOf(resources.OfType<Encounter>().ToArray())),
-                Reply(BundleOf(resources.OfType<CareTeam>().ToArray())));
-            using var http = new HttpClient(handler);
-            var source = new HttpFhirDataSource(http, Options());
-            var patient = await source.ReadPatientAsync(TestIdentifier, default);
-            var result = await new PopulationEngine(source).CreateAsync(q, new(patient, true));
-            Check(source.RequestCount == 4 && handler.Requests.Count == 4, "four requests including cache reuse");
-            var items = Flatten(result.Response.Item).ToDictionary(i => i.LinkId!);
-            Check(((FhirString)items["nameText"].Answer.Single().Value!).Value == "Syntetisk DHG-eksempel", "name.text");
-            Check(((FhirBoolean)items["interpreterRequired"].Answer.Single().Value!).Value == false, "preserve false");
-            Check(items["birthDate"].Answer.Count == 0, "no inferred birth date");
-            Check(((Quantity)items["gestationalAge"].Answer.Single().Value!).Value == 210, "unknown status remains usable");
-            Check(((Quantity)items["systolic"].Answer.Single().Value!).Value == 128, "blood pressure component");
-            Check(items["consultationDates"].Answer.Count == 1 && items["careTeamContacts"].Answer.Count == 1, "Encounter and contained contacts");
-            Check(result.Response.Subject?.Reference == "Patient/" + patient.Id, "pseudonym subject");
-            Check(!new FhirJsonSerializer().SerializeToString(result.Response).Contains(TestIdentifier), "no NIN in QR");
-            foreach (var request in handler.Requests)
+            foreach (var method in new[] { "GET", "POST" })
             {
-                Check(request.Method == HttpMethod.Post && request.Uri.Query.Length == 0, "POST without query");
-                Check(request.ContentType == "application/x-www-form-urlencoded", "form content");
-                Check(request.Accept == "application/fhir+json" && !request.HasCredentials, "anonymous contract");
-                var form = QueryHelpers.ParseQuery(request.Body);
-                var expectedKey = request.Uri.AbsolutePath == "/fhir/Patient/_search" ? "identifier" : "patient.identifier";
-                Check(form.Count == 1 && form[expectedKey] == TestIdentifier, "correct patient selection field");
+                var options = Options(); options.SearchMethod = method;
+                options.PatientLookup.Parameter = "custom-identifier";
+                using var handler = new Handler(Reply(BundleOf(Patient())), Reply(BundleOf()));
+                using var http = new HttpClient(handler);
+                var source = new HttpFhirDataSource(http, options);
+                var patient = await source.ReadPatientAsync(TestIdentifier, default);
+                await source.SearchAsync(Search(patient), new(patient, true), default);
+                Check(handler.Requests.Count == 2, "one patient lookup and one clinical search");
+                foreach (var (request, index) in handler.Requests.Select((r, i) => (r, i)))
+                {
+                    var type = index == 0 ? "Patient" : "Observation";
+                    Check(request.Method.Method == method && request.Uri.AbsolutePath ==
+                        $"/fhir/{type}" + (method == "POST" ? "/_search" : ""), "configured transport");
+                    Check(request.Accept == "application/fhir+json" && !request.HasCredentials, "anonymous source");
+                    Check(method == "POST" ? request.Uri.Query.Length == 0 && request.ContentType == "application/x-www-form-urlencoded"
+                        : request.Body.Length == 0 && request.ContentType is null, "method-specific encoding");
+                    var parameters = QueryHelpers.ParseQuery(method == "POST" ? request.Body : request.Uri.Query);
+                    Check(parameters.Count == 1 && parameters[index == 0 ? "custom-identifier" : "subject.identifier"] == TestIdentifier,
+                        "configured patient lookup and binding");
+                }
             }
         }),
-        ("DHG: form-enkoding bevarer tokenfiltre og ledende nuller", async () =>
+        ("FHIR-kilde: form-enkoding bevarer tokenfiltre og ledende nuller", async () =>
         {
-            using var handler = new Handler(Reply(BundleOf(DemoFiles.DhgPatient())), Reply(BundleOf()));
+            using var handler = new Handler(Reply(BundleOf(Patient())), Reply(BundleOf()));
             using var http = new HttpClient(handler);
             var source = new HttpFhirDataSource(http, Options());
             var patient = await source.ReadPatientAsync("00000000001", default);
             var code = "urn:example:code|a+b&c";
             await source.SearchAsync(Search(patient, "&code=" + Uri.EscapeDataString(code) + "&category=vital-signs&date=ge2026-09-01"), new(patient, true), default);
             var form = QueryHelpers.ParseQuery(handler.Requests[1].Body);
-            Check(form["patient.identifier"] == "00000000001" && form["code"] == code && form["date"] == "ge2026-09-01", "form roundtrip");
+            Check(form["subject.identifier"] == "00000000001" && form["code"] == code && form["date"] == "ge2026-09-01", "form roundtrip");
             Check(!form.ContainsKey("patient"), "logical ID not sent as search identity");
         }),
-        ("DHG: ugyldig eller ikke godkjent NIN stoppes før nettverkskall", async () =>
+        ("FHIR-kilde: konfigurert mønster og tillatte identifikatorer håndheves før nettverkskall", async () =>
         {
             using var handler = new Handler();
             using var http = new HttpClient(handler);
-            var source = new HttpFhirDataSource(http, Options());
-            foreach (var id in new[] { "", "demo-patient", "12345678901", "29760484634\n", "２９７６０４８４６３４", "urn:nin|29760484634" })
+            var options = Options();
+            options.PatientIdentifierPattern = @"\ATEST-[0-9]{3}\z";
+            options.AllowedTestPatientIdentifiers = [TestIdentifier];
+            var source = new HttpFhirDataSource(http, options);
+            foreach (var id in new[] { "", "not-an-identifier", "TEST-002", "TEST-001\n", "TEST-００１", "urn:test|TEST-001" })
                 await Error("patient-context", () => source.ReadPatientAsync(id, default));
             Check(handler.Requests.Count == 0, "no requests");
         }),
-        ("DHG: manglende eller tvetydig Patient gir ikke QR", async () =>
+        ("FHIR-kilde: manglende eller tvetydig Patient gir ikke QR", async () =>
         {
-            using var handler = new Handler(Reply(BundleOf()), Reply(BundleOf(DemoFiles.DhgPatient(), DemoFiles.DhgPatient())));
+            using var handler = new Handler(Reply(BundleOf()), Reply(BundleOf(Patient(), Patient())));
             using var http = new HttpClient(handler);
             var source = new HttpFhirDataSource(http, Options());
             await Error("source-patient-not-found", () => source.ReadPatientAsync(TestIdentifier, default));
             await Error("source-contract", () => source.ReadPatientAsync(TestIdentifier, default));
         }),
-        ("DHG: Patient må ha gyldig pseudonym ID", async () =>
+        ("FHIR-kilde: gyldig ressurs-ID og valgfritt krav om separat identifikator", async () =>
         {
             foreach (var id in new string?[] { null, "../other", TestIdentifier })
             {
-                var patient = DemoFiles.DhgPatient(); patient.Id = id;
+                var patient = Patient(); patient.Id = id;
                 using var http = new HttpClient(new Handler(Reply(BundleOf(patient))));
-                await Error(id == "../other" ? "source-json" : "source-contract", () => new HttpFhirDataSource(http, Options()).ReadPatientAsync(TestIdentifier, default));
+                var options = Options(); options.PatientLookup.RequireDistinctResourceId = true;
+                await Error(id == "../other" ? "source-json" : "source-contract", () => new HttpFhirDataSource(http, options).ReadPatientAsync(TestIdentifier, default));
             }
+            using var ordinary = new HttpClient(new Handler(Reply(BundleOf(new Patient { Id = TestIdentifier }))));
+            Check((await new HttpFhirDataSource(ordinary, Options()).ReadPatientAsync(TestIdentifier, default)).Id == TestIdentifier,
+                "equal ID is allowed when the configured restriction is off");
         }),
-        ("DHG: feil pasient stoppes for alle støttede ressurser", async () =>
+        ("FHIR-kilde: feil pasient stoppes for alle støttede ressurser", async () =>
         {
-            var fixtures = DemoFiles.DhgResources();
-            var observation = fixtures.OfType<Observation>().First(); observation.Subject = new("Patient/other");
-            var encounter = fixtures.OfType<Encounter>().First(); encounter.Subject = new("Patient/other");
-            var careTeam = fixtures.OfType<CareTeam>().First(); careTeam.Subject = new("Patient/other");
-            Resource[] wrong = [observation, encounter, careTeam];
+            Resource[] wrong = [
+                new Observation { Id = "observation", Status = ObservationStatus.Final,
+                    Code = new CodeableConcept("urn:test", "measurement"), Subject = new("Patient/other") },
+                Encounter("other"),
+                new CareTeam { Id = "team", Status = CareTeam.CareTeamStatus.Active, Subject = new("Patient/other") }
+            ];
             foreach (var resource in wrong)
             {
-                using var http = new HttpClient(new Handler(Reply(BundleOf(DemoFiles.DhgPatient())), Reply(BundleOf(resource))));
+                using var http = new HttpClient(new Handler(Reply(BundleOf(Patient())), Reply(BundleOf(resource))));
                 var source = new HttpFhirDataSource(http, Options());
                 var patient = await source.ReadPatientAsync(TestIdentifier, default);
                 await Error("patient-mismatch", () => source.SearchAsync(Search(patient, resource: resource.TypeName), new(patient, true), default));
             }
         }),
-        ("DHG: ukjent ressurstype i søkesvar avvises", async () =>
+        ("FHIR-kilde: ukjent ressurstype i søkesvar avvises", async () =>
         {
-            using var http = new HttpClient(new Handler(Reply(BundleOf(DemoFiles.DhgPatient())), Reply(BundleOf(DemoFiles.DhgResources().OfType<Encounter>().First()))));
+            using var http = new HttpClient(new Handler(Reply(BundleOf(Patient())), Reply(BundleOf(Encounter()))));
             var source = new HttpFhirDataSource(http, Options());
             var patient = await source.ReadPatientAsync(TestIdentifier, default);
             await Error("source-contract", () => source.SearchAsync(Search(patient), new(patient, true), default));
         }),
-        ("DHG: ingen gjenbruk av kontekst etter mislykket pasientbytte", async () =>
+        ("FHIR-kilde: ingen gjenbruk av kontekst etter mislykket pasientbytte", async () =>
         {
-            using var handler = new Handler(Reply(BundleOf(DemoFiles.DhgPatient())), Reply(BundleOf()));
+            using var handler = new Handler(Reply(BundleOf(Patient())), Reply(BundleOf()));
             using var http = new HttpClient(handler);
             var source = new HttpFhirDataSource(http, Options());
             var patient = await source.ReadPatientAsync(TestIdentifier, default);
-            await Error("source-patient-not-found", () => source.ReadPatientAsync("11859699482", default));
+            await Error("source-patient-not-found", () => source.ReadPatientAsync("TEST-002", default));
             await Error("patient-context", () => source.SearchAsync(Search(patient), new(patient, true), default));
             Check(handler.Requests.Count == 2, "no stale search");
         }),
-        ("DHG: manglende eller avvist kontekst gir ingen søk", async () =>
+        ("FHIR-kilde: manglende eller avvist kontekst gir ingen søk", async () =>
         {
-            using var handler = new Handler(Reply(BundleOf(DemoFiles.DhgPatient())));
+            using var handler = new Handler(Reply(BundleOf(Patient())));
             using var http = new HttpClient(handler);
             var source = new HttpFhirDataSource(http, Options());
-            var patient = DemoFiles.DhgPatient();
+            var patient = Patient();
             await Error("patient-context", () => source.SearchAsync(Search(patient), new(patient, true), default));
             await source.ReadPatientAsync(TestIdentifier, default);
             await Error("authorization", () => source.SearchAsync(Search(patient), new(patient, false), default));
@@ -156,28 +159,42 @@ internal static class DhgSelfTests
             await Error("patient-context", () => source.SearchAsync(Search(other), new(other, true), default));
             Check(handler.Requests.Count == 1, "only patient lookup");
         }),
-        ("DHG: ugyldige og gjentatte filtre avvises før POST", async () =>
+        ("FHIR-kilde: konfigurerte ressurs-, dato- og tokenbegrensninger håndheves", async () =>
         {
-            using var handler = new Handler(Reply(BundleOf(DemoFiles.DhgPatient())));
+            using var handler = new Handler(Reply(BundleOf(Patient())));
             using var http = new HttpClient(handler);
-            var source = new HttpFhirDataSource(http, Options());
+            var options = Options();
+            options.Capabilities.Resources["Observation"] = new()
+            {
+                SearchParameters = ["subject.identifier", "code", "category", "date"],
+                MaxOccurrences = new() { ["date"] = 1 },
+                TokenParameters = ["code"], DateParameters = ["date"],
+                TokenSystems = new() { ["category"] = "urn:test:category" }
+            };
+            var source = new HttpFhirDataSource(http, options);
             var patient = await source.ReadPatientAsync(TestIdentifier, default);
-            foreach (var suffix in new[] { "&date=ge2026-01-01&date=le2026-12-31", "&date=2026-02-30", "&date=sa2026-09-01", "&code=85354-9", "&code=a|b|c", "&category=https://wrong.example|survey" })
+            foreach (var suffix in new[] { "&date=ge2026-01-01&date=le2026-12-31", "&date=2026-02-30", "&date=sa2026-09-01", "&code=measurement", "&code=a|b|c", "&category=urn:wrong|survey", "&unsupported=value" })
                 await Error("query-policy", () => source.SearchAsync(Search(patient, suffix), new(patient, true), default));
+            await Error("query-policy", () => source.SearchAsync(Search(patient, resource: "Procedure"), new(patient, true), default));
             // Forged objects must not bypass the query parser or become arbitrary routes.
             await Error("query-policy", () => source.SearchAsync(new("../Patient", [new("patient", patient.Id!)]), new(patient, true), default));
             Check(handler.Requests.Count == 1, "no invalid search");
         }),
-        ("DHG: 4096-byte-grense kontrolleres etter form-enkoding", async () =>
+        ("FHIR-kilde: konfigurert størrelsesgrense gjelder etter form-enkoding", async () =>
         {
-            using var handler = new Handler(Reply(BundleOf(DemoFiles.DhgPatient())));
-            using var http = new HttpClient(handler);
-            var source = new HttpFhirDataSource(http, Options());
-            var patient = await source.ReadPatientAsync(TestIdentifier, default);
-            await Error("query-policy", () => source.SearchAsync(Search(patient, "&category=" + new string('x', 4060)), new(patient, true), default));
-            Check(handler.Requests.Count == 1, "oversize form not sent");
+            foreach (var limit in new[] { 128, 512 })
+            {
+                using var handler = new Handler(Reply(BundleOf(Patient())));
+                using var http = new HttpClient(handler);
+                var options = Options(); options.Capabilities.MaxFormBytes = limit;
+                var source = new HttpFhirDataSource(http, options);
+                var patient = await source.ReadPatientAsync(TestIdentifier, default);
+                var value = new string('æ', limit / 3);
+                await Error("query-policy", () => source.SearchAsync(Search(patient, "&category=" + Uri.EscapeDataString(value)), new(patient, true), default));
+                Check(handler.Requests.Count == 1, "oversize encoded form not sent");
+            }
         }),
-        ("DHG: feilstatus eksponerer ikke kildens rå feilmelding", async () =>
+        ("FHIR-kilde: feilstatus eksponerer ikke kildens rå feilmelding", async () =>
         {
             foreach (var status in new[] { 400, 401, 403, 404, 429, 503, 302 })
             {
@@ -186,30 +203,31 @@ internal static class DhgSelfTests
                 Check(error.Message.Contains(status.ToString()) && !error.Message.Contains("sensitive"), "safe status only");
             }
         }),
-        ("DHG: OperationOutcome og ugyldige HTTP 200-svar avvises", async () =>
+        ("FHIR-kilde: OperationOutcome og ugyldige HTTP 200-svar avvises", async () =>
         {
             var outcome = new OperationOutcome { Issue = [new() { Severity = OperationOutcome.IssueSeverity.Error, Code = OperationOutcome.IssueType.Processing }] };
             (Resource, string)[] cases = [(outcome, "source-outcome"), (BundleOf(outcome), "source-outcome"),
-                (DemoFiles.DhgPatient(), "source-contract"), (new Bundle { Type = Bundle.BundleType.Collection }, "source-contract")];
+                (Patient(), "source-contract"), (new Bundle { Type = Bundle.BundleType.Collection }, "source-contract")];
             foreach (var (resource, code) in cases)
             {
                 using var http = new HttpClient(new Handler(Reply(resource)));
                 await Error(code, () => new HttpFhirDataSource(http, Options()).ReadPatientAsync(TestIdentifier, default));
             }
         }),
-        ("DHG: delvis Bundle og neste-side-lenke følges ikke", async () =>
+        ("FHIR-kilde: konfigurert Paging none avviser neste side og ufullstendige svar", async () =>
         {
-            var page = BundleOf(DemoFiles.DhgPatient());
+            var page = BundleOf(Patient());
             page.Link.Add(new() { Relation = "next", Url = "https://untrusted.example/Patient" });
-            var partial = BundleOf(DemoFiles.DhgPatient()); partial.Total = 2;
+            var partial = BundleOf(Patient()); partial.Total = 2;
             using var handler = new Handler(Reply(page), Reply(partial));
             using var http = new HttpClient(handler);
-            var source = new HttpFhirDataSource(http, Options());
+            var options = Options(); options.Capabilities.Paging = "none"; options.Capabilities.RequireTotal = true;
+            var source = new HttpFhirDataSource(http, options);
             await Error("source-paging", () => source.ReadPatientAsync(TestIdentifier, default));
             await Error("source-contract", () => source.ReadPatientAsync(TestIdentifier, default));
             Check(handler.Requests.Count == 2, "no paging calls");
         }),
-        ("DHG: HTML, ugyldig JSON og for store svar avvises", async () =>
+        ("FHIR-kilde: HTML, ugyldig JSON og for store svar avvises", async () =>
         {
             (string, string, string)[] cases = [("<html>upstream</html>", "text/html", "source-content"),
                 ("{broken", "application/fhir+json", "source-json"),
@@ -220,7 +238,7 @@ internal static class DhgSelfTests
                 await Error(code, () => new HttpFhirDataSource(http, Options()).ReadPatientAsync(TestIdentifier, default));
             }
         }),
-        ("DHG: kansellering stopper før nettverkskall", async () =>
+        ("FHIR-kilde: kansellering stopper før nettverkskall", async () =>
         {
             using var handler = new Handler();
             using var http = new HttpClient(handler);
@@ -229,7 +247,7 @@ internal static class DhgSelfTests
             catch (OperationCanceledException) { Check(handler.Requests.Count == 0, "no requests"); return; }
             throw new InvalidOperationException("expected cancellation");
         }),
-        ("DHG: ugyldig transport og kapabilitetskonfigurasjon avvises", () =>
+        ("FHIR-kilde: ugyldig transport og kapabilitetskonfigurasjon avvises", () =>
         {
             var invalid = new[] { Options(), Options(), Options() };
             invalid[0].SearchMethod = "unsupported";
@@ -245,8 +263,6 @@ internal static class DhgSelfTests
         })
     ];
 
-    private static IEnumerable<QuestionnaireResponse.ItemComponent> Flatten(IEnumerable<QuestionnaireResponse.ItemComponent> items) =>
-        items.SelectMany(i => new[] { i }.Concat(Flatten(i.Item)));
     private static void Check(bool ok, string message) { if (!ok) throw new InvalidOperationException(message); }
     private static async Task<PopulationException> Error(string code, Func<SysTask> action)
     {
@@ -254,8 +270,7 @@ internal static class DhgSelfTests
         catch (PopulationException e) when (e.Code == code) { return e; }
         throw new InvalidOperationException("Expected " + code);
     }
-    // Registrer formen på kallene for å kontrollere at NIN bare sendes i kroppen og at testmodus
-    // ikke legger på tilgangsheadere. Handler returnerer planlagte svar i stedet for å bruke nettverk.
+    // Registrer transporten. Handler returnerer planlagte svar i stedet for å bruke nettverk.
     private sealed record RecordedRequest(HttpMethod Method, Uri Uri, string Body, string? ContentType, string Accept, bool HasCredentials);
     private sealed class Handler(params HttpResponseMessage[] responses) : HttpMessageHandler
     {
@@ -263,8 +278,8 @@ internal static class DhgSelfTests
         public List<RecordedRequest> Requests { get; } = [];
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
         {
-            Requests.Add(new(request.Method, request.RequestUri!, await request.Content!.ReadAsStringAsync(ct),
-                request.Content.Headers.ContentType?.MediaType, string.Join(",", request.Headers.Accept),
+            Requests.Add(new(request.Method, request.RequestUri!, request.Content is null ? "" : await request.Content.ReadAsStringAsync(ct),
+                request.Content?.Headers.ContentType?.MediaType, string.Join(",", request.Headers.Accept),
                 request.Headers.Authorization is not null || request.Headers.Contains("DPoP") || request.Headers.Contains("X-Patient-Context")));
             return queue.Dequeue();
         }

@@ -10,51 +10,55 @@ internal static class FhirTransportSelfTests
 {
     public static IEnumerable<(string, Func<SysTask>)> Cases()
     {
-        foreach (var dhg in new[] { false, true })
+        foreach (var postSearch in new[] { false, true })
         {
-            var name = dhg ? "DHG POST" : "FHIR GET";
-            yield return ($"{name}: frist avbryter forsinkede headere", () => Deadline(dhg, true));
-            yield return ($"{name}: frist avbryter pågående strømming uten Content-Length", () => Deadline(dhg, false));
-            yield return ($"{name}: operasjonskansellering avbryter pågående strømming", () => CallerCancellation(dhg));
-            yield return ($"{name}: komplett strømmet svar leses og frigjøres", () => Success(dhg));
+            var name = postSearch ? "FHIR POST search" : "FHIR GET";
+            yield return ($"{name}: frist avbryter forsinkede headere", () => Deadline(postSearch, true));
+            yield return ($"{name}: frist avbryter pågående strømming uten Content-Length", () => Deadline(postSearch, false));
+            yield return ($"{name}: operasjonskansellering avbryter pågående strømming", () => CallerCancellation(postSearch));
+            yield return ($"{name}: komplett strømmet svar leses og frigjøres", () => Success(postSearch));
         }
     }
 
-    private static async SysTask Deadline(bool dhg, bool delayHeaders)
+    private static async SysTask Deadline(bool postSearch, bool delayHeaders)
     {
-        using var handler = new StreamingHandler(dhg, delayHeaders, stallBody: true);
+        using var handler = new StreamingHandler(postSearch, delayHeaders, stallBody: true);
         using var client = new HttpClient(handler) { Timeout = TimeSpan.FromMilliseconds(300) };
         using var caller = new CancellationTokenSource();
-        await ExpectCancellation(Read(dhg, client, caller.Token));
+        await ExpectCancellation(Read(postSearch, client, caller.Token));
         Check(!caller.IsCancellationRequested, "call deadline must not cancel the enclosing operation");
         Check(handler.Calls == 1, "one request only");
         if (!delayHeaders)
             Check(handler.Body is { ReadStarted: true, Disposed: true }, "body read started and response stream disposed");
     }
 
-    private static async SysTask CallerCancellation(bool dhg)
+    private static async SysTask CallerCancellation(bool postSearch)
     {
-        using var handler = new StreamingHandler(dhg, delayHeaders: false, stallBody: true);
+        using var handler = new StreamingHandler(postSearch, delayHeaders: false, stallBody: true);
         using var client = new HttpClient(handler) { Timeout = Timeout.InfiniteTimeSpan };
         using var caller = new CancellationTokenSource();
-        var reading = Read(dhg, client, caller.Token);
+        var reading = Read(postSearch, client, caller.Token);
         await handler.BodyReading.Task.WaitAsync(TimeSpan.FromSeconds(3));
         caller.Cancel();
         await ExpectCancellation(reading);
         Check(handler.Body is { Disposed: true }, "caller cancellation disposes the body stream");
     }
 
-    private static async SysTask Success(bool dhg)
+    private static async SysTask Success(bool postSearch)
     {
-        using var handler = new StreamingHandler(dhg, delayHeaders: false, stallBody: false);
+        using var handler = new StreamingHandler(postSearch, delayHeaders: false, stallBody: false);
         using var client = new HttpClient(handler);
-        var patient = await Read(dhg, client, default);
+        var patient = await Read(postSearch, client, default);
         Check(patient.Id == "synthetic-patient", "expected patient returned");
         Check(handler.Body is { Disposed: true }, "successful response stream disposed");
     }
 
-    private static Task<Patient> Read(bool dhg, HttpClient client, CancellationToken ct) => dhg
-        ? new HttpFhirDataSource(client, DhgSelfTests.Options()).ReadPatientAsync("00000000001", ct)
+    private static Task<Patient> Read(bool postSearch, HttpClient client, CancellationToken ct) => postSearch
+        ? new HttpFhirDataSource(client, new FhirSourceOptions
+            {
+                Id = "stream-test", BaseUrl = "http://127.0.0.1/fhir/", SearchMethod = "POST",
+                PatientLookup = new() { Interaction = "search" }
+            }).ReadPatientAsync("synthetic-identifier", ct)
         : new HttpFhirDataSource(client, new Uri("http://127.0.0.1/fhir/"), new LocalDemoAuthorizer())
             .ReadPatientAsync("synthetic-patient", ct);
 
@@ -70,7 +74,7 @@ internal static class FhirTransportSelfTests
         if (!condition) throw new InvalidOperationException(message);
     }
 
-    private sealed class StreamingHandler(bool dhg, bool delayHeaders, bool stallBody) : HttpMessageHandler
+    private sealed class StreamingHandler(bool postSearch, bool delayHeaders, bool stallBody) : HttpMessageHandler
     {
         public int Calls { get; private set; }
         public ResponseStream? Body { get; private set; }
@@ -79,10 +83,10 @@ internal static class FhirTransportSelfTests
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
         {
             Calls++;
-            Check(request.Method == (dhg ? HttpMethod.Post : HttpMethod.Get), "adapter method");
+            Check(request.Method == (postSearch ? HttpMethod.Post : HttpMethod.Get), "configured method");
             if (delayHeaders) await SysTask.Delay(Timeout.InfiniteTimeSpan, ct);
             const string patient = "{\"resourceType\":\"Patient\",\"id\":\"synthetic-patient\"}";
-            var json = dhg ? "{\"resourceType\":\"Bundle\",\"type\":\"searchset\",\"total\":1,\"entry\":[{\"resource\":" + patient + "}]}" : patient;
+            var json = postSearch ? "{\"resourceType\":\"Bundle\",\"type\":\"searchset\",\"total\":1,\"entry\":[{\"resource\":" + patient + "}]}" : patient;
             Body = new ResponseStream(Encoding.UTF8.GetBytes(json), stallBody, BodyReading);
             var response = new HttpResponseMessage(HttpStatusCode.OK) { Content = new StreamContent(Body) };
             response.Content.Headers.ContentType = new MediaTypeHeaderValue("application/fhir+json");

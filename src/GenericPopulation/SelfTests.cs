@@ -6,7 +6,7 @@ using QType = Hl7.Fhir.Model.Questionnaire.QuestionnaireItemType;
 namespace GenericPopulation;
 
 /// <summary>
-/// Lokale regresjonstester for motor, skjema-/søkegrenser og HTTP-klienter, inkludert DhgSelfTests.
+/// Lokale regresjonstester for motor, skjema-/søkegrenser og konfigurerbare HTTP-klienter.
 /// Bruker syntetiske filer og falske HTTP-svar uten eksterne kall eller eget testbibliotek.
 /// Kjør fra prosjektet med dotnet run -- --self-test.
 /// </summary>
@@ -235,11 +235,12 @@ public static class SelfTests
                 Check(result.Outcome.Issue.Count > 0, "OperationOutcome.issue 1..*");
             })
         };
-        cases.AddRange(DhgSelfTests.Cases());
+        cases.AddRange(FhirSourceSelfTests.Cases());
         cases.AddRange(FhirTransportSelfTests.Cases());
         cases.AddRange(RoutingSelfTests.Cases());
         cases.AddRange(QuestionnaireRoutingSelfTests.Cases());
         cases.AddRange(ConfigurationSelfTests.Cases());
+        cases.AddRange(EndpointConnectivitySelfTests.Cases());
         var failed = 0;
         foreach (var (name, test) in cases)
         {

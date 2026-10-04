@@ -32,7 +32,7 @@ button:disabled,select:disabled {
   cursor:wait
 }
 /* Synlig tastaturfokus; hidden må vinne over komponentenes display-regler når app.js bytter tilstand. */
-button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,[tabindex]:focus-visible {
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,a:focus-visible,summary:focus-visible,[tabindex]:focus-visible {
   outline:3px solid #45a999;
   outline-offset:3px
 }
@@ -205,25 +205,22 @@ h1 {
   margin-left:8px
 }
 .connection-fields {
-  display:flex;
+  display:grid;
+  grid-template-columns:minmax(0,1.15fr) minmax(0,1fr) minmax(200px,.8fr);
   gap:24px;
-  align-items:center;
+  align-items:start;
   margin-top:19px
 }
 .field {
   display:flex;
   flex-direction:column;
+  min-width:0;
   gap:8px
-}
-.source-field {
-  flex:1.25
-}
-.patient-field {
-  flex:1
 }
 .field label {
   font-size:12px;
-  font-weight:600
+  font-weight:600;
+  line-height:1.5
 }
 .field input,.field select {
   border:1px solid #d7e1db;
@@ -240,6 +237,7 @@ h1 {
 }
 .field-help {
   font-size:10px;
+  line-height:1.6;
   color:var(--muted);
   overflow-wrap:anywhere;
   min-height:14px
@@ -250,9 +248,9 @@ h1 {
 .connection-note {
   display:flex;
   gap:10px;
+  margin-top:26px;
   padding-left:24px;
-  border-left:1px solid var(--border);
-  flex:.95
+  border-left:1px solid var(--border)
 }
 .note-symbol {
   display:grid;
@@ -270,14 +268,41 @@ h1 {
   line-height:1.7;
   margin:0
 }
-.connection-note span:not(.note-symbol) {
-  color:var(--muted);
+.connection-note a {
+  color:var(--teal);
+  text-underline-offset:3px;
   font-size:11px
 }
+.connection-endpoints {
+  display:grid;
+  grid-template-columns:140px minmax(0,1fr);
+  gap:12px 20px;
+  margin-top:20px;
+  padding:14px 16px;
+  border-radius:6px;
+  background:var(--soft);
+  font-size:11px;
+  line-height:1.6
+}
+#endpoint-label { font-weight:600 }
+#endpoint { list-style:none; padding:0; margin:0; min-width:0 }
+#endpoint li { display:grid; grid-template-columns:minmax(0,1fr) minmax(230px,.9fr); align-items:start; gap:12px 20px; overflow-wrap:anywhere }
+#endpoint li + li { margin-top:12px; padding-top:12px; border-top:1px solid var(--border) }
+#endpoint .mono { color:var(--muted); font-size:10px }
+.endpoint-identity { display:flex; flex-direction:column; gap:4px; min-width:0 }
+.endpoint-status-control { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:6px 12px; min-width:0 }
+.endpoint-status { display:flex; align-items:center; gap:7px; font-size:11px; line-height:1.5 }
+.endpoint-light { width:9px; height:9px; border-radius:50%; background:#74837d; flex-shrink:0 }
+.endpoint-status[data-state=ok] .endpoint-light { background:#24704e }
+.endpoint-status[data-state=warning] .endpoint-light,.endpoint-status[data-state=checking] .endpoint-light { background:#9a6500 }
+.endpoint-status[data-state=error] .endpoint-light { background:#b33729 }
+.endpoint-check-info { grid-column:1 / -1; font-size:11px; line-height:1.6; color:var(--muted); overflow-wrap:anywhere }
+.endpoint-check-info:empty { display:none }
+.endpoint-check-help { grid-column:1 / -1; font-size:10px; line-height:1.6; color:var(--muted); margin:0 }
 /* Arbeidsflate: skjemaeditor og resultat ved siden av hverandre på brede skjermer. */
 .workspace {
   display:grid;
-  grid-template-columns:1fr 1fr;
+  grid-template-columns:minmax(0,1fr) minmax(0,1fr);
   gap:24px;
   align-items:stretch
 }
@@ -329,12 +354,14 @@ h1 {
 }
 .example-picker {
   display:flex;
+  min-width:0;
   gap:8px;
   align-items:center;
   font-size:10px;
   color:var(--muted)
 }
 .example-picker select {
+  min-width:0;
   max-width:230px;
   border:1px solid var(--border);
   border-radius:5px;
@@ -710,8 +737,15 @@ footer p {
   }
 }
 @media(max-width:1000px) {
+  .connection-fields {
+    grid-template-columns:repeat(2,minmax(0,1fr))
+  }
   .connection-note {
-    display:none
+    grid-column:1 / -1;
+    margin-top:0;
+    padding:12px 0 0;
+    border-left:0;
+    border-top:1px solid var(--border)
   }
   .panel-heading {
     padding:15px
@@ -786,8 +820,15 @@ footer p {
   }
   .connection-fields {
     gap:16px;
-    flex-direction:column;
-    align-items:stretch
+    grid-template-columns:minmax(0,1fr)
+  }
+  .connection-endpoints {
+    grid-template-columns:minmax(0,1fr);
+    gap:6px;
+    padding:12px
+  }
+  #endpoint li {
+    grid-template-columns:minmax(0,1fr)
   }
   .workspace {
     grid-template-columns:1fr;

@@ -1,0 +1,79 @@
+{
+  "resourceType": "Questionnaire",
+  "id": "hapi-weight",
+  "url": "https://example.org/fhir/Questionnaire/hapi-weight",
+  "version": "1.0.0",
+  "status": "active",
+  "title": "Kroppsvekt fra HAPI – syntetiske testdata",
+  "description": "Henter den nyeste ferdigstilte kroppsvekten i kg med måletid som effectiveDateTime. Status final, amended og corrected godtas. Andre enheter omregnes ikke. Manglende eller tvetydig vekt blir ubesvart. Velg en profil med HAPI FHIR R4 som kilde og en syntetisk Patient-ID som finnes der.",
+  "subjectType": ["Patient"],
+  "extension": [
+    {
+      "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-launchContext",
+      "extension": [
+        {
+          "url": "name",
+          "valueCoding": {
+            "system": "http://hl7.org/fhir/uv/sdc/CodeSystem/launchContext",
+            "code": "patient"
+          }
+        },
+        { "url": "type", "valueCode": "Patient" }
+      ]
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/variable",
+      "valueExpression": {
+        "name": "weightBundle",
+        "language": "application/x-fhir-query",
+        "expression": "Observation?patient={{%patient.id}}&code=http://loinc.org|29463-7"
+      }
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/variable",
+      "valueExpression": {
+        "name": "weightCandidates",
+        "language": "text/fhirpath",
+        "expression": "%weightBundle.entry.resource.ofType(Observation).where((status = 'final' or status = 'amended' or status = 'corrected') and code.coding.where(system = 'http://loinc.org' and code = '29463-7').exists() and effective.ofType(dateTime).exists() and value.ofType(Quantity).where(system = 'http://unitsofmeasure.org' and code = 'kg' and value.exists() and comparator.empty()).exists())"
+      }
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/variable",
+      "valueExpression": {
+        "name": "weightLatest",
+        "language": "text/fhirpath",
+        "expression": "%weightCandidates.where(effective = %weightCandidates.effective.aggregate(iif($total.empty(), $this, iif($this > $total, $this, $total))))"
+      }
+    }
+  ],
+  "item": [
+    {
+      "linkId": "weight",
+      "text": "Nyeste ferdigstilte kroppsvekt i kg",
+      "type": "quantity",
+      "extension": [
+        {
+          "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-initialExpression",
+          "valueExpression": {
+            "language": "text/fhirpath",
+            "expression": "%weightLatest.value.ofType(Quantity)"
+          }
+        }
+      ]
+    },
+    {
+      "linkId": "measuredAt",
+      "text": "Måletid for kroppsvekten",
+      "type": "dateTime",
+      "extension": [
+        {
+          "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-initialExpression",
+          "valueExpression": {
+            "language": "text/fhirpath",
+            "expression": "%weightLatest.effective.ofType(dateTime)"
+          }
+        }
+      ]
+    }
+  ]
+}

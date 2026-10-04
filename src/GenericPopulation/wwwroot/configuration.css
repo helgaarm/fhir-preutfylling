@@ -1,5 +1,17 @@
 .configuration-page { padding-bottom:24px }
 .configuration-page .intro { gap:20px }
+.config-guide { padding:22px 24px; margin-bottom:18px }
+.config-guide h2 { font-size:16px; margin:0 0 18px }
+.config-guide-steps { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:24px; list-style:none; counter-reset:config-step; padding:0; margin:0 }
+.config-guide-steps > li { counter-increment:config-step; position:relative; padding-left:34px }
+.config-guide-steps > li::before { content:counter(config-step); position:absolute; left:0; top:0; display:grid; place-items:center; width:24px; height:24px; border-radius:6px; background:var(--soft); color:var(--teal); font:12px var(--mono) }
+.config-guide h3 { font-size:14px; line-height:1.6; margin:0 0 6px }
+.config-guide h3 span { display:block; color:var(--muted); font-size:12px; font-weight:400 }
+.config-guide p,.config-guide-start li { font-size:12px; line-height:1.7; color:var(--muted); margin:0 }
+.config-guide-start { margin-top:18px; padding-top:14px; border-top:1px solid var(--border) }
+.config-guide-start summary,.config-field-guide summary { color:var(--teal); cursor:pointer; font-size:12px; font-weight:600; line-height:1.6 }
+.config-guide-start ol { padding-left:20px; margin:12px 0 0 }
+.config-guide-start li + li { margin-top:6px }
 .config-toolbar { padding:20px 24px; margin-bottom:18px }
 .config-toolbar .field-help { font-size:12px; line-height:1.6; margin:14px 0 }
 .config-actions { display:flex; flex-wrap:wrap; gap:10px; align-items:center }
@@ -27,17 +39,40 @@
 .config-field textarea { border:1px solid var(--border); border-radius:6px; height:170px; padding:12px; font-size:12px }
 .config-field textarea.line-list { height:85px; white-space:pre-wrap }
 .config-field .field-help { font-size:11px; line-height:1.6 }
+.config-field-guide { min-width:0; border:1px solid var(--border); border-radius:6px; background:var(--soft); padding:10px 12px }
+.config-field-guide dl { margin:12px 0; font-size:12px; line-height:1.7 }
+.config-field-guide dt { font-family:var(--mono); font-weight:600; overflow-wrap:anywhere }
+.config-field-guide dd { margin:2px 0 10px; color:var(--muted); overflow-wrap:anywhere }
+.config-field-guide p { font-size:12px; line-height:1.7; margin:12px 0 6px; color:var(--muted) }
+.config-field-guide pre { white-space:pre-wrap; overflow-wrap:anywhere; padding:12px; margin:8px 0 0; border:1px solid var(--border); border-radius:4px; background:var(--white) }
 .config-editor { min-width:0 }
+.config-endpoint-check { padding:16px 24px; background:var(--soft); border-bottom:1px solid var(--border) }
+.config-endpoint-check > p { font-size:12px; line-height:1.6; color:var(--muted); margin:0 0 10px }
 .configuration-page .message { margin:0 0 18px }
 .configuration-page footer { gap:14px; flex-wrap:wrap }
-@media(max-width:900px) { .config-layout { grid-template-columns:1fr } #config-list { max-height:270px; overflow:auto } }
+.config-modal-open { overflow:hidden }
+.config-json-dialog { width:min(960px,calc(100% - 32px)); max-height:calc(100vh - 32px); max-height:calc(100dvh - 32px); padding:0; border:1px solid var(--border); border-radius:12px; background:var(--white); color:var(--ink); box-shadow:0 24px 80px #173d3833 }
+.config-json-dialog[open] { display:flex; flex-direction:column }
+.config-json-dialog::backdrop { background:#173d3866 }
+.config-json-heading { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:20px 24px 12px; flex-shrink:0 }
+.config-json-heading h2 { font-size:18px; line-height:1.4; margin:0 }
+.config-json-heading button { flex-shrink:0 }
+#config-json-description { font-size:12px; line-height:1.7; color:var(--muted); padding:0 24px 18px; margin:0; flex-shrink:0 }
+#config-json-content { min-height:0; overflow:auto; overscroll-behavior:contain; white-space:pre-wrap; overflow-wrap:anywhere; margin:0; padding:20px 24px; border-top:1px solid var(--border); background:var(--soft); font:12px/1.7 var(--mono); outline-offset:-3px }
+#config-json-code { font:inherit }
+@media(max-width:900px) { .config-layout { grid-template-columns:1fr } #config-list { max-height:270px; overflow:auto } .config-guide-steps { grid-template-columns:1fr; gap:18px } }
 @media(max-width:560px) {
   #config-fields { grid-template-columns:1fr; padding:18px }
   .config-field.full-width { grid-column:auto }
-  .config-toolbar { padding:18px }
+  .config-toolbar,.config-guide { padding:18px }
+  .config-endpoint-check { padding:16px 18px }
   .config-actions .primary-button { width:100% }
   .config-editor .panel-heading { align-items:start; flex-direction:column }
   .configuration-page .intro { align-items:start; flex-direction:column }
   .configuration-page .subtitle { line-height:1.6 }
   .configuration-page .config-checkbox { align-items:start }
+  .config-json-heading { padding:16px 16px 10px; gap:10px }
+  .config-json-heading h2 { font-size:16px }
+  #config-json-description { padding:0 16px 14px }
+  #config-json-content { padding:16px; font-size:11px }
 }
