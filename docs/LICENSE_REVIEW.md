@@ -47,7 +47,7 @@ Verktøyene nedenfor brukes under utvikling/CI og distribueres ikke gjennom appe
 | Verktøy / undersøkt versjon | Lisens eller vilkår / kilde |
 | --- | --- |
 | .NET SDK 9.0.318; .NET/ASP.NET Core 9.0.20 i lokalt miljø | .NET har MIT og egne tredjepartsmerknader. Det er skilt mellom separat installert runtime og filer som faktisk videreformidles. [Runtime 9.0.20](https://github.com/dotnet/runtime/tree/v9.0.20). |
-| Playwright Python 1.63.0 | Apache-2.0, kontrollert i installert pakkemetadata og LICENSE. Valgfri nettlesertest; ikke en appavhengighet. Ved videreformidling av testmiljøet må også Playwrights NOTICE, driver, Node og nettleserlisenser kontrolleres. [Offisielt prosjekt](https://github.com/microsoft/playwright-python). |
+| Playwright Python 1.63.0 | Apache-2.0, kontrollert i installert pakkemetadata og LICENSE. Brukes til nettlesertester lokalt og i CI; ikke en appavhengighet. Ved videreformidling av testmiljøet må også Playwrights NOTICE, driver, Node og nettleserlisenser kontrolleres. [Offisielt prosjekt](https://github.com/microsoft/playwright-python). |
 | greenlet 3.5.6; pyee 13.0.1; typing_extensions 4.16.0 | Henholdsvis `MIT AND PSF-2.0`, `MIT` og `PSF-2.0` i den undersøkte lokale installasjonen. Ikke låst som prosjektavhengigheter. |
 | actions/checkout v7.0.1 | MIT, [fast revisjon](https://github.com/actions/checkout/blob/3d3c42e5aac5ba805825da76410c181273ba90b1/LICENSE). |
 | actions/setup-dotnet v6.0.0 | MIT, [fast revisjon](https://github.com/actions/setup-dotnet/blob/a98b56852c35b8e3190ac28c8c2271da59106c68/LICENSE). |
@@ -81,6 +81,8 @@ python scripts/check-licenses.py --publish-dir publish
 ```
 
 Kontrollen bruker standardbiblioteket i Python og ingen nettverk. Den sammenligner også kopierte pakkemerknader med originalene i lokal NuGet-cache. Hashene for tekst beregnes etter UTF-8-dekoding uten BOM og normalisering av linjeskift til LF, slik at Git på Windows/Linux gir samme resultat. Øvrig innhold, inkludert mellomrom, beholdes.
+
+Inventarformat 2 lagrer også gjennomgåtte sjekksummer for `LICENSE` og `THIRD-PARTY-NOTICES.md` i `reviewedDocuments`. Tomme eller avkortede dokumenter avvises selv om kilde og publish er like. Ved en tilsiktet endring av disse dokumentene må hele innholdet gjennomgås før den normaliserte SHA-256-sjekksummen oppdateres i inventaret. Endret sjekksum kan aldri godkjenne et tomt dokument.
 
 CI kjører kontrollen etter restore og etter publish, i tillegg til regresjoner for kontrollen. Dette dokumenterer konsistens og at lisensfilene følger med; det er ikke automatisk juridisk godkjenning av ukjente rettigheter eller nedlastede verktøy.
 

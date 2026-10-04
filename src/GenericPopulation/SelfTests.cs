@@ -235,6 +235,7 @@ public static class SelfTests
             })
         };
         cases.AddRange(DhgSelfTests.Cases());
+        cases.AddRange(FhirTransportSelfTests.Cases());
         var failed = 0;
         foreach (var (name, test) in cases)
         {

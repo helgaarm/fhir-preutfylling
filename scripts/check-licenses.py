@@ -14,6 +14,7 @@ import xml.etree.ElementTree as ET
 ROOT = Path(__file__).resolve().parents[1]
 DOCUMENTS = ('LICENSE', 'THIRD-PARTY-NOTICES.md', 'LICENSES/inventory.json',
              'docs/LICENSE_REVIEW.md', 'docs/PROVENANCE.md', 'examples/README.md')
+INTEGRITY_DOCUMENTS = ('LICENSE', 'THIRD-PARTY-NOTICES.md')
 
 
 def require(condition, message):
@@ -38,12 +39,23 @@ def verify(root, publish_dir=None):
     inventory = json.loads((root / 'LICENSES/inventory.json').read_text(encoding='utf-8'))
     lock = json.loads((project / 'packages.lock.json').read_text(encoding='utf-8'))
     assets = json.loads((project / 'obj/project.assets.json').read_text(encoding='utf-8-sig'))
-    require(inventory['schemaVersion'] == 1, 'Ukjent lisensoversiktsformat.')
+    require(inventory['schemaVersion'] == 2, 'Ukjent lisensoversiktsformat.')
     require(set(inventory['targetFrameworks']) == set(lock['dependencies']),
             'Målrammeverk er endret. Gjennomgå og oppdater lisensoversikten.')
     project_xml = ET.parse(project / 'GenericPopulation.csproj').getroot()
     require(project_xml.findtext('./PropertyGroup/PackageLicenseExpression') == 'MIT',
             'Prosjektlisensen avviker fra gjennomgangen.')
+
+    # Sammenligning med publish alene oppdager ikke at begge kopier har mistet samme innhold.
+    documents = inventory.get('reviewedDocuments', [])
+    require(len(documents) == len(INTEGRITY_DOCUMENTS)
+            and {item['path'] for item in documents} == set(INTEGRITY_DOCUMENTS),
+            'Mangler gjennomgått integritetsgrunnlag for hoveddokumentene.')
+    for item in documents:
+        source = repository_file(root, item['path'])
+        require(source.read_text(encoding='utf-8-sig').strip(), f'Tomt lisensdokument: {item["path"]}')
+        require(text_hash(source) == item['sha256NormalizedUtf8'],
+                f'Lisensdokument er endret: {item["path"]}. Gjennomgå innholdet før sjekksummen oppdateres.')
 
     legal = {item['path']: item for item in inventory['legalFiles']}
     require(len(legal) == len(inventory['legalFiles']), 'Dupliserte lisensfiler i oversikten.')

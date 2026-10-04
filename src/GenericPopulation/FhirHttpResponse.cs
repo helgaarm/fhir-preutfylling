@@ -11,8 +11,17 @@ internal static class FhirHttpResponse
 {
     private const int MaxBytes = 2 * 1024 * 1024;
 
+    /// <summary>HttpClient-fristen gjelder hele kallet, også strømming etter mottatte headere.</summary>
+    public static async Task<Resource> SendAsync(HttpClient client, HttpRequestMessage request, CancellationToken ct)
+    {
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        deadline.CancelAfter(client.Timeout);
+        using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, deadline.Token);
+        return await ReadAsync(response, deadline.Token);
+    }
+
     /// <summary>Leser inntil 2 MiB FHIR JSON; transportfeil og OperationOutcome avbryter innhentingen.</summary>
-    public static async Task<Resource> ReadAsync(HttpResponseMessage response, CancellationToken ct)
+    private static async Task<Resource> ReadAsync(HttpResponseMessage response, CancellationToken ct)
     {
         // Feilsvar fra kilden kan inneholde pasientdata eller tilgangsinformasjon.
         if (!response.IsSuccessStatusCode)
@@ -32,9 +41,11 @@ internal static class FhirHttpResponse
                 throw new PopulationException("response-size", "Datakildens svar er for stort.");
             await memory.WriteAsync(buffer.AsMemory(0, read), ct);
         }
+        ct.ThrowIfCancellationRequested();
         Resource resource;
         try { resource = new FhirJsonDeserializer().Deserialize<Resource>(System.Text.Encoding.UTF8.GetString(memory.ToArray())); }
         catch (Exception) { throw new PopulationException("source-json", "Ugyldig FHIR JSON fra datakilden."); }
+        ct.ThrowIfCancellationRequested();
         if (resource is OperationOutcome)
             throw new PopulationException("source-outcome", "FHIR-kilden returnerte OperationOutcome i stedet for de forespurte dataene.");
         return resource;

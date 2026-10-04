@@ -1,5 +1,28 @@
 # Verifisert leveranse
 
+## Rettelser etter fullstack-gjennomgang: P2
+
+Kontrollert 4. oktober 2026 med syntetiske data og lokale tjenester. De fire P2-funnene er rettet:
+
+- Filinnlesing låser handlingene før asynkron lesing starter og fjerner gammelt resultat. Sene API-svar og feil forkastes hvis input er endret.
+- Innlimt Questionnaire beholdes under oppstart, og handlingene aktiveres etter konfigurasjonslasting også uten eksempellasting. Konfigurasjonsfeil holder preutfylling avslått.
+- En koblet frist dekker både HTTP-headere og hele svarkroppen i GET- og DHG-klienten. Operasjonens samlede kansellering beholdes.
+- `LICENSE` og `THIRD-PARTY-NOTICES.md` kontrolleres mot gjennomgåtte sjekksummer i inventarformat 2. Tomme og avkortede dokumenter avvises også når publish inneholder samme skadede tekst.
+
+| Kontroll | Resultat |
+| --- | --- |
+| Release-bygg og publisering med `--warnaserror` | Bestått |
+| C#-regresjoner, inkludert frist, kansellering under lesing og frigjøring av strømmer for GET/POST | 52 av 52 bestått |
+| Generiske HTTP-regresjoner / DHG mot lokal testdobbel | 24 av 24 / 24 av 24 bestått |
+| Lisenskontrollens regresjoner | 10 av 10 bestått; omfatter tom/avkortet tekst i kilde og publish, manglende integritetsgrunnlag og normaliserte linjeskift |
+| Lisensinventar og publiserte dokumenter | Alle 11 NuGet-pakker kontrollert |
+| Eksisterende nettleserflyt i Edge, desktop og mobil | Bestått uten JavaScript-feil |
+| Nye asynkrone nettleserregresjoner | 7 av 7 bestått: tidlig innliming, konfigurasjonsfeil, utsatt fil-lesing, feil/rett forsøk og foreldede svar/feil |
+| Opprinnelig timeout-reproduksjon mot publisert app | HTTP 504 / OperationOutcome etter 20,37 sekunder; ingen QR |
+| Python-/JavaScript-syntaks, actionlint og `git diff --check` | Bestått |
+
+Nettlesersuitene kjøres også i CI via `dhg-http-smoke.py --browser` med Chromium og lokal testkilde. P3-funnene om gruppedybde og DHG-størrelsestestens grensedata er ikke omfattet av denne rettelsen.
+
 ## Lisensgjennomgang
 
 Kontrollert 4. oktober 2026. [Gjennomgangen](../docs/LICENSE_REVIEW.md) dokumenterer prosjektets og bibliotekenes lisensgrunnlag. Eiers bekreftelse er registrert i [opprinnelsesoversikten](../docs/PROVENANCE.md).

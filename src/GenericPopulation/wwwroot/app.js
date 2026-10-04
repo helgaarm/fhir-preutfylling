@@ -4,7 +4,7 @@
 // Resultater holdes i minnet; lagring skjer bare gjennom brukerens nedlasting eller kopiering.
 const $ = id => document.getElementById(id);
 // config kommer fra /api/config; envelope er Parameters med QR + OperationOutcome; qr er selve svaret.
-let config, envelope, qr, busy = false;
+let config, envelope, qr, busy = false, initializing = true, inputRevision = 0;
 const flatten = items => (items || []).flatMap(item => [item, ...flatten(item.item)]);
 const pretty = value => JSON.stringify(value, null, 2);
 const selectedSource = () => config?.sources.find(s => s.id === $('source').value);
@@ -18,16 +18,23 @@ function message(text, error = false) {
 }
 /** Fjern forrige resultat når kilde, pasient eller skjema endres, så gamle svar ikke vises som aktuelle. */
 function invalidate() {
+  inputRevision++;
   qr = envelope = null;
   $('output-result').hidden = true;
-  $('output-empty').hidden = false;
+  $('output-empty').hidden = busy;
   message('');
 }
 /** Lås input under asynkrone kall og velg mellom tom, ventende og ferdig resultatvisning. */
-function setBusy(value) {
+function setBusy(value, activity = 'populate') {
   busy = value;
-  for (const id of ['populate', 'source', 'patient', 'test-patient', 'example', 'upload', 'format', 'questionnaire']) $(id).disabled = value;
-  $('run-label').textContent = value ? 'Preutfyller …' : 'Hent data og preutfyll';
+  for (const id of ['populate', 'source', 'patient', 'test-patient', 'example', 'upload', 'file'])
+    $(id).disabled = value || initializing || !config;
+  // Eget skjema kan redigeres mens konfigurasjonen lastes, også hvis oppstarten feiler.
+  for (const id of ['format', 'questionnaire']) $(id).disabled = value;
+  $('run-label').textContent = value ? (activity === 'questionnaire' ? 'Leser skjema …' : 'Preutfyller …') : 'Hent data og preutfyll';
+  $('output-loading').querySelector('h3').textContent = activity === 'questionnaire' ? 'Leser skjema …' : 'Henter data fra FHIR …';
+  $('output-loading').querySelector('p').textContent = activity === 'questionnaire'
+    ? 'Venter på at Questionnaire er ferdig lastet.' : 'Leser Patient, kjører søk fra Q og bygger QR.';
   $('output-loading').hidden = !value;
   $('output-empty').hidden = value || !!qr;
   $('output-result').hidden = value || !qr;
@@ -66,13 +73,16 @@ function updateInfo() {
 }
 // Leser et lokalt Q-eksempel fra appen. Dette starter ingen oppslag hos en ekstern FHIR-kilde.
 async function loadExample(name) {
-  invalidate(); setBusy(true);
+  invalidate(); setBusy(true, 'questionnaire');
+  const revision = inputRevision;
   try {
     const response = await fetch(`/api/examples/${encodeURIComponent(name)}`);
     if (!response.ok) throw new Error('Kunne ikke laste eksempelskjema.');
-    $('questionnaire').value = pretty(await response.json());
+    const data = await response.json();
+    if (revision !== inputRevision) return;
+    $('questionnaire').value = pretty(data);
     updateInfo();
-  } catch (error) { message(error.message, true); }
+  } catch (error) { if (revision === inputRevision) message(error.message, true); }
   finally { setBusy(false); }
 }
 /** Hold synlig panel, ARIA-valg og tastaturfokus samordnet for resultatfanene. */
@@ -144,8 +154,9 @@ function showResult(questionnaire, elapsed, requestCount) {
 }
 /** Valider enkel input, kall appens API og vis resultatet. Backend utfører alle FHIR-oppslag. */
 async function populate() {
-  if (busy || !config) return;
+  if (busy || initializing || !config) return;
   invalidate();
+  const revision = inputRevision;
   let questionnaire;
   try {
     questionnaire = JSON.parse($('questionnaire').value);
@@ -169,6 +180,8 @@ async function populate() {
       signal: AbortSignal.timeout(65000)
     });
     const data = await response.json();
+    // Et sent svar eller en sen feil fra tidligere input skal aldri bli et aktuelt resultat.
+    if (revision !== inputRevision) return;
     if (!response.ok) {
       const details = (data.issue || []).map(i => i.details?.text || i.diagnostics).filter(Boolean).join('\n');
       throw new Error(details || `Preutfylling feilet (HTTP ${response.status}).`);
@@ -179,6 +192,7 @@ async function populate() {
     showResult(questionnaire, performance.now() - start, response.headers.get('X-Fhir-Requests'));
     message('QR er klar. Kontroller forhåndsvisningen og merknadene før videre bruk.');
   } catch (error) {
+    if (revision !== inputRevision) return;
     qr = envelope = null;
     message(error.name === 'TimeoutError' ? 'Tidsgrensen ble overskredet. Kontroller FHIR-kilden og prøv igjen.' : error.message, true);
   } finally { setBusy(false); }
@@ -205,13 +219,18 @@ $('format').addEventListener('click', () => {
 $('upload').addEventListener('click', () => $('file').click());
 $('file').addEventListener('change', async () => {
   const file = $('file').files[0]; if (!file) return;
+  if (busy || initializing || !config) { $('file').value = ''; return; }
+  // Lås før første await; ellers kan preutfylling starte med det forrige skjemaet.
+  invalidate(); setBusy(true, 'questionnaire');
+  const revision = inputRevision;
   try {
     if (file.size > 240 * 1024) throw new Error('Q-filen kan ikke være større enn 240 KiB.');
     const data = JSON.parse(await file.text());
+    if (revision !== inputRevision) return;
     if (data.resourceType !== 'Questionnaire') throw new Error('Filen må inneholde et FHIR Questionnaire.');
-    invalidate(); $('questionnaire').value = pretty(data); $('example').value = 'custom'; updateInfo();
-  } catch (error) { message(error.message, true); }
-  finally { $('file').value = ''; }
+    $('questionnaire').value = pretty(data); $('example').value = 'custom'; updateInfo();
+  } catch (error) { if (revision === inputRevision) message(error.message, true); }
+  finally { $('file').value = ''; setBusy(false); }
 });
 for (const tab of document.querySelectorAll('.tab')) {
   tab.addEventListener('click', () => selectTab(tab.dataset.panel));
@@ -233,6 +252,7 @@ document.addEventListener('keydown', event => {
 });
 // Oppstart henter kildevalg og et eksempelskjema fra egen server. Ingen DHG-oppslag kjøres her.
 (async () => {
+  setBusy(false);
   try {
     const response = await fetch('/api/config');
     if (!response.ok) throw new Error('Kunne ikke hente serverkonfigurasjon.');
@@ -242,5 +262,10 @@ document.addEventListener('keydown', event => {
     }
     $('patient').value = config.defaultPatientId;
     await updateSource();
-  } catch (error) { message('Kunne ikke starte appen: ' + error.message, true); }
+  } catch (error) { config = undefined; message('Kunne ikke starte appen: ' + error.message, true); }
+  finally {
+    initializing = false;
+    // Aktiver også handlingene når brukeren allerede har limt inn eget Q.
+    setBusy(false);
+  }
 })();
