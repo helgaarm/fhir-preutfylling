@@ -189,7 +189,7 @@ src/GenericPopulation/
   RoutingSelfTests.cs        Regresjoner for ruting, cache og generisk transport
   FixtureDataSource.cs        Syntetiske demoressurser
   SelfTests.cs                Opprinnelige regresjonstester uten ekstra testrammeverk
-  DhgSelfTests.cs              DHG-kontrakt, pasientisolering og feiltilfeller
+  FhirSourceSelfTests.cs       Generiske konfigurasjonsvalg, pasientisolering og feilgrenser
   wwwroot/                    Norsk, responsivt webgrensesnitt
 examples/                     Q-er, Patient, Observations og eksempelrequest
 verification/                 HTTP-/nettlesertester og testresultater

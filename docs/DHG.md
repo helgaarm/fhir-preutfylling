@@ -114,7 +114,9 @@ dotnet publish src/GenericPopulation --configuration Release --no-build --output
 python verification/dhg-http-smoke.py --app-dir publish
 ```
 
-HTTP-testen starter en lokal DHG-testdobbel og appen på egne loopback-porter, bruker bare syntetiske data og stopper prosessene etterpå. Den inngår i CI og kontakter aldri Azure eller DHG.
+C#-selvtestene kontrollerer generiske konfigurasjonsvalg og FHIR-transport med egne syntetiske oppsett. De laster ikke DHG-kilden fra appsettings eller bruker DHG-eksempelfilene. Å legge til en ny server krever ingen ny leverandørspesifikk C#-testklasse.
+
+Den separate HTTP-testen under `verification/` kontrollerer DHG-eksemplet og dets konfigurasjon. Den starter en lokal DHG-testdobbel og appen på egne loopback-porter, bruker bare syntetiske data og stopper prosessene etterpå. Den inngår i CI og kontakter aldri Azure eller DHG.
 
 Med Python Playwright og en nettleser installert kan UI-testene kjøres mot samme testdobbel med `--browser`. Eksempel i PowerShell med installert Edge:
 
