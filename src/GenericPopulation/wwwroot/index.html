@@ -20,7 +20,7 @@
       <div class="field patient-field"><label id="patient-label" for="patient">Patient-ID</label><input id="patient" value="demo-patient" maxlength="64" spellcheck="false" autocomplete="off" aria-describedby="patient-help"><select id="test-patient" aria-describedby="patient-help" hidden></select><span id="patient-help" class="field-help">Logisk ressurs-ID, for eksempel demo-patient.</span></div>
       <div class="connection-note"><span class="note-symbol" aria-hidden="true">i</span><p>Bruk syntetiske testdata.<br><a href="/configuration.html">Endre profiler og kilder</a></p></div>
     </div>
-    <div class="connection-endpoints"><span id="endpoint-label">Kilder i valgt profil</span><ul id="endpoint" aria-labelledby="endpoint-label"></ul><p class="endpoint-check-help">Test tilkobling sjekker kontakt med serveren uten pasientoppslag. Statusen gjelder siste kontroll, ikke tilgang til FHIR-data.</p></div>
+    <div class="connection-endpoints"><span id="endpoint-label">Kilder i valgt profil</span><ul id="endpoint" aria-labelledby="endpoint-label"></ul><p class="endpoint-check-help">Test tilkobling sjekker FHIR-metadata uten pasientoppslag. Grønt bekrefter FHIR R4-metadata, ikke tilgang til pasientdata.</p></div>
   </section>
   <!-- Editor og resultat er separate paneler, slik at originalskjema og genererte svar ikke blandes. -->
   <div class="workspace">

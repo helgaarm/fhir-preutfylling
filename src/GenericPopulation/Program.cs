@@ -153,8 +153,8 @@ app.MapGet("/health", () => Results.Json(new { status = "ok" }));
 // Offentlige lisensfiler fra appens distribusjon, uten pasientdata eller brukerbestemte filstier.
 // Tekstformat bevarer den originale juridiske ordlyden uten å tolke den som HTML.
 app.MapGet("/licenses", () => Results.Text(LicenseText(), "text/plain; charset=utf-8"));
-app.MapMethods("/demo/fhir/", ["HEAD"], () => Results.NoContent());
-app.MapMethods("/demo/vitals/", ["HEAD"], () => Results.NoContent());
+app.MapGet("/demo/fhir/metadata", DemoMetadata);
+app.MapGet("/demo/vitals/metadata", DemoMetadata);
 
 // Lokal syntetisk FHIR-kilde: demoen går gjennom samme GET-klient og HTTP-kontroller som eksterne kilder.
 app.MapGet("/demo/fhir/Patient/{id}", (string id) => id == "demo-patient"
@@ -178,6 +178,13 @@ app.MapGet("/demo/vitals/Observation", async (HttpRequest request, CancellationT
 // Samme behandling med to svarformater: Parameters med QR + merknader, eller bare QR.
 app.MapPost("/api/populate", (Func<HttpContext, Task<IResult>>)(context => Populate(context, false)));
 app.MapPost("/api/questionnaire-response", (Func<HttpContext, Task<IResult>>)(context => Populate(context, true)));
+
+static IResult DemoMetadata() => Results.Json(new
+{
+    resourceType = "CapabilityStatement", status = "active", date = "2026-10-04", kind = "instance",
+    fhirVersion = "4.0.1", format = new[] { "application/fhir+json" },
+    implementation = new { description = "Lokal syntetisk FHIR-kilde for preutfyllingsdemoen." }
+}, contentType: "application/fhir+json");
 
 async Task<IResult> Populate(HttpContext httpContext, bool responseOnly)
 {

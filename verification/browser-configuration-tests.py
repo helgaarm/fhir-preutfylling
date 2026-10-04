@@ -47,6 +47,7 @@ async def main():
             await expect(endpoint.locator('.endpoint-status')).to_have_attribute('data-state', 'unknown')
             await endpoint.get_by_role('button', name='Test tilkobling').click()
             await expect(endpoint.locator('.endpoint-status')).to_have_attribute('data-state', 'ok')
+            await expect(endpoint.locator('.endpoint-check-info')).to_contain_text('FHIR R4-metadata er bekreftet')
             await expect(endpoint.locator('.endpoint-check-info')).to_contain_text('Sjekket kl.')
             assert (await (await context.request.get(BASE + '/api/configuration')).json()) == original
             await expect(page.locator('#config-state')).to_have_text('Lagret')

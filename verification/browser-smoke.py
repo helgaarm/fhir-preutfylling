@@ -25,6 +25,7 @@ with sync_playwright() as p:
     expect(page.locator('#endpoint .endpoint-status')).to_have_attribute('data-state', 'unknown')
     page.locator('#endpoint').get_by_role('button', name='Test tilkobling').click()
     expect(page.locator('#endpoint .endpoint-status')).to_have_attribute('data-state', 'ok')
+    expect(page.locator('#endpoint .endpoint-check-info')).to_contain_text('FHIR R4-metadata er bekreftet')
     page.locator('#populate').click()
     expect(page.locator('#output-result')).to_be_visible()
     expect(page.locator('#answered')).to_have_text('5/6')

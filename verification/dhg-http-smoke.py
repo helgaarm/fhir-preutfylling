@@ -56,12 +56,19 @@ class DhgMock(BaseHTTPRequestHandler):
 
     def do_GET(self):
         self.calls.append(('GET', self.path, {}))
-        self.send_json({'resourceType': 'OperationOutcome'}, 405)
-
-    def do_HEAD(self):
-        self.calls.append(('HEAD', self.path, {}))
+        if self.path != '/fhir/metadata':
+            self.send_json({'resourceType': 'OperationOutcome'}, 405)
+            return
         assert not self.headers.get('Authorization') and not self.headers.get('Content-Length')
-        status = {'status-auth': 401, 'status-missing': 404, 'status-redirect': 302, 'status-error': 503}.get(self.mode, 204)
+        assert self.headers['Accept'] == 'application/fhir+json'
+        status = {'status-auth': 401, 'status-missing': 404, 'status-redirect': 302, 'status-error': 503}.get(self.mode, 200)
+        if status == 200:
+            if self.mode == 'status-not-fhir':
+                self.send_json({'resourceType': 'OperationOutcome'})
+            else:
+                self.send_json({'resourceType': 'CapabilityStatement',
+                                'fhirVersion': '5.0.0' if self.mode == 'status-not-r4' else '4.0.1'})
+            return
         self.send_response(status)
         if status == 302:
             self.send_header('Location', '/must-not-follow')
@@ -188,15 +195,16 @@ def main():
                   'DHG source exposes only configured synthetic patient choices')
             check(not DhgMock.calls, 'No DHG requests on startup or config read')
             probe = {'configurationRevision': config['revision']}
-            for mode, expected_state, expected_http in [('normal', 'ok', 204), ('status-auth', 'warning', 401),
+            for mode, expected_state, expected_http in [('normal', 'ok', 200), ('status-auth', 'warning', 401),
+                    ('status-not-fhir', 'warning', 200), ('status-not-r4', 'warning', 200),
                     ('status-missing', 'warning', 404), ('status-redirect', 'warning', 302), ('status-error', 'error', 503)]:
                 DhgMock.mode = mode
                 before_probe = len(DhgMock.calls)
                 status, result, result_headers = call('/api/sources/dhg-test/status', probe)
                 check(status == 200 and result['state'] == expected_state and result['httpStatus'] == expected_http
                       and result['checkedAt'] and result_headers['Cache-Control'] == 'no-store'
-                      and DhgMock.calls[before_probe:] == [('HEAD', '/fhir/', {})],
-                      f'Endpoint check: {mode}, one anonymous HEAD without redirects or patient data')
+                      and DhgMock.calls[before_probe:] == [('GET', '/fhir/metadata', {})],
+                      f'Endpoint check: {mode}, one anonymous metadata GET without redirects or patient data')
             before_probe = len(DhgMock.calls)
             for label, path, payload, custom_headers, expected in [
                 ('stale revision', '/api/sources/dhg-test/status', {'configurationRevision': 'old'}, {}, 409),
