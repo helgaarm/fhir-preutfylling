@@ -1,56 +1,41 @@
 using System.Text.RegularExpressions;
+using Hl7.Fhir.FhirPath;
 using Hl7.Fhir.Model;
 
 namespace GenericPopulation;
 
-/// <summary>
-/// Beskriver et relativt, pasientavgrenset søk uavhengig av transport og serveradresse.
-/// Bruk Parse eller FromTemplate for å kontrollere søket før det sendes til en datakilde.
-/// </summary>
-public sealed record FhirSearch(string ResourceType,
-    IReadOnlyList<KeyValuePair<string, string>> Parameters)
+/// <summary>Identifiserer en konkret variable-extension uten å legge endepunkter inn i Questionnaire.</summary>
+public sealed record QueryOrigin(string Questionnaire, string Version, string? LinkId, string Variable);
+
+/// <summary>Relativt FHIR-søk. Parseren håndhever syntaks og pasientavgrensning; API-begrensninger ligger i kildekonfigurasjonen.</summary>
+public sealed record FhirSearch(string ResourceType, IReadOnlyList<KeyValuePair<string, string>> Parameters)
 {
-    private static readonly HashSet<string> Resources =
-        ["Observation", "Encounter", "CareTeam"];
-    private static readonly HashSet<string> AllowedParameters =
-        ["patient", "code", "category", "date"];
-
-    /// <summary>Leser en enkeltverdi; bruk Parameters ved gjentatte date-grenser i vanlig FHIR.</summary>
-    public string? Get(string name) => Parameters
-        .Where(p => p.Key == name).Select(p => p.Value).SingleOrDefault();
-
-    /// <summary>URL-koder søket for GET og for motorens cache. DHG oversetter det til POST-felter.</summary>
+    public QueryOrigin? Origin { get; init; }
+    public string? Get(string name) => Parameters.Where(p => p.Key == name).Select(p => p.Value).SingleOrDefault();
     public string RelativeUrl => ResourceType + "?" + string.Join("&", Parameters.Select(p =>
         Uri.EscapeDataString(p.Key) + "=" + Uri.EscapeDataString(p.Value)));
+    public static bool IsLogicalId(string? value) => value is not null && Regex.IsMatch(value, @"\A[A-Za-z0-9\-.]{1,64}\z");
+    public static bool IsResourceType(string value) => Enum.TryParse<Hl7.Fhir.Model.ResourceType>(value, out var type) &&
+        Enum.IsDefined(type) && type.ToString() == value;
+    public static bool IsParameterName(string value) => Regex.IsMatch(value, @"\A[A-Za-z_][A-Za-z0-9_.:-]*\z");
 
-    /// <summary>
-    /// Setter inn pasientens logiske ressurs-ID i {{%patient.id}} og validerer resultatet.
-    /// Andre maluttrykk støttes ikke; NIN skal ikke settes inn i skjemaets søkemal.
-    /// </summary>
     public static FhirSearch FromTemplate(string template, PopulationContext context)
     {
-        var id = context.Patient.Id;
-        if (string.IsNullOrWhiteSpace(id) ||
-            !Regex.IsMatch(id, @"\A[A-Za-z0-9\-.]{1,64}\z"))
+        if (!IsLogicalId(context.Patient.Id))
             throw new PopulationException("patient-context", "Ugyldig logisk pasient-ID.");
-        var expanded = template.Replace("{{%patient.id}}", Uri.EscapeDataString(id),
-            StringComparison.Ordinal);
+        var expanded = template.Replace("{{%patient.id}}", Uri.EscapeDataString(context.Patient.Id!), StringComparison.Ordinal);
         if (expanded.Contains('{') || expanded.Contains('}'))
             throw new PopulationException("query-template", "Ustøttet søkemal.");
-        return Parse(expanded, id);
+        return Parse(expanded, context.Patient.Id!);
     }
 
-    /// <summary>
-    /// Tillater bare kjente ressurser og parametre med nøyaktig riktig pasientfilter.
-    /// Absolutte URL-er og utvidelser som _include faller utenfor denne søkeprofilen.
-    /// </summary>
     public static FhirSearch Parse(string relative, string expectedPatientId)
     {
         if (relative.Length > 4096 || relative.Contains('#') || relative.Contains('\\'))
             throw new PopulationException("query-policy", "Ulovlig relativt FHIR-søk.");
         var parts = relative.Split('?', 2);
-        if (parts.Length != 2 || !Resources.Contains(parts[0]))
-            throw new PopulationException("query-policy", "Ressurstypen er ikke tillatt.");
+        if (parts.Length != 2 || !IsResourceType(parts[0]))
+            throw new PopulationException("query-policy", "Forventet en FHIR R4-ressurstype i et relativt søk.");
         var pairs = new List<KeyValuePair<string, string>>();
         foreach (var part in parts[1].Split('&', StringSplitOptions.RemoveEmptyEntries))
         {
@@ -59,40 +44,30 @@ public sealed record FhirSearch(string ResourceType,
                 throw new PopulationException("query-policy", "Ugyldig søkeparameter.");
             var key = Uri.UnescapeDataString(kv[0].Replace('+', ' '));
             var value = Uri.UnescapeDataString(kv[1].Replace('+', ' '));
-            if (!AllowedParameters.Contains(key) || string.IsNullOrWhiteSpace(value) ||
-                value.Any(char.IsControl))
-                throw new PopulationException("query-policy", "Søkeparameteren er ikke tillatt.");
+            // Inkluderte/omvendte ressurser og projeksjoner passer ikke kontrakten: alle treff må
+            // ha forventet type og en kontrollerbar pasientreferanse. Dette er klientens sikkerhetsgrense.
+            if (!IsParameterName(key) || string.IsNullOrWhiteSpace(value) || value.Any(char.IsControl) ||
+                key.Split(':')[0] is "_include" or "_revinclude" or "_has" or "_filter" or "_elements" or "_summary" ||
+                key.StartsWith("patient:", StringComparison.Ordinal) || key.StartsWith("patient.", StringComparison.Ordinal))
+                throw new PopulationException("query-policy", "Søkeparameteren faller utenfor den pasientavgrensede søkekontrakten.");
             pairs.Add(new(key, value));
         }
-        // Vanlig FHIR kan bruke flere date-grenser; DHG-klienten har en strengere egen kontroll.
-        if (pairs.GroupBy(p => p.Key).Any(g => g.Count() > 1 && g.Key != "date"))
-            throw new PopulationException("query-policy", "Tvetydige søkeparametre.");
-        if (pairs.Count(p => p.Key == "patient") != 1 ||
+        if (!IsLogicalId(expectedPatientId) || pairs.Count(p => p.Key == "patient") != 1 ||
             pairs.Single(p => p.Key == "patient").Value != expectedPatientId)
             throw new PopulationException("patient-context", "Pasientfilteret stemmer ikke med konteksten.");
-        if (parts[0] != "Observation" && pairs.Any(p => p.Key != "patient"))
-            throw new PopulationException("query-policy", "Søkeparameter støttes ikke for ressursen.");
         return new(parts[0], pairs);
     }
 
-    /// <summary>
-    /// Kontrollerer subject-referansen i returnerte kliniske ressurser, også når kilden svarer 200.
-    /// Tillater relativ referanse eller absolutt referanse på godkjent base. Kilden må fortsatt
-    /// håndheve autorisasjon; OperationOutcome behandles separat av klienten eller motoren.
-    /// </summary>
-    public static void AssertSubject(Resource resource, string id, Uri? baseUri = null)
+    /// <summary>Kontrollerer valgt pasient i alle treff. Sentral og lokal base kan ha samme avtalte pasient-ID.</summary>
+    public static void AssertSubject(Resource resource, string id, Uri? baseUri = null,
+        string referencePath = "subject", Uri? patientBaseUri = null)
     {
         if (resource is OperationOutcome) return;
-        string? reference = resource switch
-        {
-            Observation o => o.Subject?.Reference,
-            Encounter e => e.Subject?.Reference,
-            CareTeam c => c.Subject?.Reference,
-            _ => throw new PopulationException("source-contract", "Uventet ressurstype fra datakilden.")
-        };
+        var values = resource.Select(referencePath).ToArray();
         var relative = "Patient/" + id;
-        if (reference == relative) return;
-        if (baseUri is not null && reference == new Uri(baseUri, relative).AbsoluteUri) return;
-        throw new PopulationException("patient-mismatch", "Datakilden returnerte en annen pasientkontekst.");
+        if (values.Length == 0 || values.Any(v => v is not ResourceReference r ||
+            !(r.Reference == relative || baseUri is not null && r.Reference == new Uri(baseUri, relative).AbsoluteUri ||
+              patientBaseUri is not null && r.Reference == new Uri(patientBaseUri, relative).AbsoluteUri)))
+            throw new PopulationException("patient-mismatch", "Datakilden returnerte en annen eller manglende pasientkontekst.");
     }
 }

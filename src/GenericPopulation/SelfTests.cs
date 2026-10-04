@@ -106,9 +106,10 @@ public static class SelfTests
             {
                 var a = new FixtureDataSource(DemoFiles.Resources());
                 var b = new FixtureDataSource(DemoFiles.Resources());
-                var router = new RoutingFhirDataSource([
-                    new("Observation", "http://loinc.org|18185-9", a),
-                    new("Observation", "http://loinc.org|85354-9", b)]);
+                var router = new RoutingFhirDataSource(new PopulationProfileOptions { Routes = [
+                    new() { ResourceType = "Observation", Code = "http://loinc.org|18185-9", Source = "a" },
+                    new() { ResourceType = "Observation", Code = "http://loinc.org|85354-9", Source = "b" }] },
+                    new Dictionary<string, IFhirDataSource> { ["a"] = a, ["b"] = b });
                 await new PopulationEngine(router).CreateAsync(DemoFiles.Questionnaire("pregnancy"), Context());
                 Check(a.SearchCount == 1 && b.SearchCount == 1, "independent sources");
             }),
@@ -236,6 +237,9 @@ public static class SelfTests
         };
         cases.AddRange(DhgSelfTests.Cases());
         cases.AddRange(FhirTransportSelfTests.Cases());
+        cases.AddRange(RoutingSelfTests.Cases());
+        cases.AddRange(QuestionnaireRoutingSelfTests.Cases());
+        cases.AddRange(ConfigurationSelfTests.Cases());
         var failed = 0;
         foreach (var (name, test) in cases)
         {

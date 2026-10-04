@@ -15,7 +15,7 @@ dotnet run --project src/GenericPopulation
 ```
 
 1. Åpne `http://127.0.0.1:5077`.
-2. Velg **DHG · Azure Test (syntetiske testpersoner)** som FHIR-endepunkt.
+2. Velg **DHG · Azure Test (syntetiske testpersoner)** som populeringsprofil.
 3. Velg **Testperson 1** eller **Testperson 2**, henholdsvis person A og B fra veiledningen.
 4. Appen velger eksemplet **DHG – svangerskap og kontakter**. Et eget innlimt skjema beholdes ved kildebytte; velg DHG-eksemplet selv hvis du vil erstatte det.
 5. Trykk **Hent data og preutfyll**. Kontroller forhåndsvisning, ubesvarte felt og merknader før eventuell nedlasting.
@@ -66,7 +66,7 @@ $qr = ($result.parameter | Where-Object name -eq 'response').resource
 
 Kroppen er `application/x-www-form-urlencoded`, med `Accept: application/fhir+json`. NIN settes ikke i URL-en. Patient-svaret må inneholde nøyaktig én ressurs med gyldig pseudonym ID. Alle senere `subject`-referanser kontrolleres mot denne ID-en. QR bruker pseudonymet; appen kopierer ikke NIN fra input til QR.
 
-Questionnaire bruker fortsatt uttrykk som `Observation?patient={{%patient.id}}&code=http://loinc.org|85354-9`. Adapteren oversetter pasientfilteret til `patient.identifier` i formkroppen. For Observation støttes `code`, `category` og ett `date`-filter. `code` krever `system|code`. Dato krever `yyyy-MM-dd` med valgfritt `eq`, `ne`, `gt`, `lt`, `ge` eller `le`. Gjentatte datofiltre og parametere som `_sort`, `_include` og `_count` avvises. Encounter og CareTeam støtter bare pasientvalget.
+Questionnaire bruker fortsatt uttrykk som `Observation?patient={{%patient.id}}&code=http://loinc.org|85354-9`. Den generiske klienten bruker `PatientBinding` til å sende `patient.identifier` i formkroppen. DHG-konfigurasjonen tillater `code`, `category` og ett `date`-filter for Observation. `code` krever `system|code`. Dato krever `yyyy-MM-dd` med valgfritt `eq`, `ne`, `gt`, `lt`, `ge` eller `le`. Gjentatte datofiltre og parametere som `_sort`, `_include` og `_count` avvises i denne konfigurasjonen. Encounter og CareTeam tillater bare pasientvalget. Disse begrensningene gjelder ikke motoren eller andre kilder.
 
 Formkroppen begrenses til 4096 byte, hvert svar til 2 MiB og hvert søkeresultat til 2000 ressurser. Et tomt searchset betyr ingen treff; HTTP-feil og OperationOutcome behandles som feil, uten delvis QR. Kildens HTTP-status vises i en kontrollert feilmelding uten rå feilkropp, NIN eller kliniske opplysninger. Redirects følges ikke. Neste-side-lenker avvises fordi POST-kontrakten ikke beskriver paginering.
 
@@ -74,13 +74,16 @@ Oppslagene er ikke en atomisk DHG-transaksjon. Klienten har en grense på 20 sek
 
 ## Konfigurasjon og tilgang
 
-Kilden er allerede lagt til i `src/GenericPopulation/appsettings.json`:
+Kilden er allerede lagt til i `src/GenericPopulation/appsettings.json`. Transportutdrag (se filen for komplett kapabilitetskonfigurasjon):
 
 ```json
 {
   "Id": "dhg-test",
   "Name": "DHG · Azure Test (syntetiske testpersoner)",
-  "Mode": "dhg-post",
+  "SearchMethod": "POST",
+  "DefaultExample": "dhg",
+  "PatientLookup": { "Interaction": "search", "Parameter": "identifier", "RequireDistinctResourceId": true },
+  "PatientBinding": { "Parameter": "patient.identifier", "ValueFrom": "inputIdentifier" },
   "BaseUrl": "https://fhir-gravid-test.blackbay-1cf2ad3e.norwayeast.azurecontainerapps.io/fhir/",
   "AllowedTestPatientIdentifiers": ["29760484634", "11859699482"]
 }
@@ -88,7 +91,9 @@ Kilden er allerede lagt til i `src/GenericPopulation/appsettings.json`:
 
 Basen skal inkludere `/fhir/` og ende med skråstrek. Bare serverkonfigurasjonen velger endepunkt. Flere testpersoner må avtales med API-tilbyderen før de legges til. Nettleseren får se listen, så den skal bare inneholde godkjente syntetiske identifikatorer.
 
-Denne modusen gjelder den **anonyme Azure-testinstansen**. Ingen Authorization-, DPoP- eller X-Patient-Context-header sendes. STS/HelseID, audience, scope, brukerflyt og eventuelle DPoP-krav for et autentisert miljø må avklares og implementeres separat. `BearerTokenEnvironmentVariable` sammen med `dhg-post` avvises ved oppstart for å unngå en feilaktig bearer-integrasjon.
+Standardoppsettet gjelder den **anonyme Azure-testinstansen** og konfigurerer ingen Authorization-, DPoP- eller X-Patient-Context-header. Den generiske klienten støtter bearer-autorisasjon også ved POST, men en bearer-header alene implementerer ikke STS/HelseID/DPoP. Tilgangsavtalen for et autentisert miljø må implementeres gjennom `IRequestAuthorizer`. `Mode: dhg-post` og den tidligere DHG-adapteren er fjernet; bruk eksplisitte transportfelt.
+
+DHG kan inngå i en profil sammen med andre kilder. Den sentrale pasienten hentes bare én gang; ingen identitetsmapping skjer i motoren. Se [FHIR-konfigurasjon](FHIR_CONFIGURATION.md) for ruteregler, sentral pasientkilde og binding fra en identifikator på Patient.
 
 ## Test uten DHG-tilgang
 
@@ -100,7 +105,7 @@ dotnet run --project src/GenericPopulation -- --demo dhg
 
 Dette skriver QR og merknader til appens `output/`-mappe, normalt `src/GenericPopulation/output/` ved `dotnet run`. Det gjør ingen nettverkskall. Dataene ligger i [dhg-patient.json](../examples/dhg-patient.json) og [dhg-resources.json](../examples/dhg-resources.json).
 
-Adapter- og HTTP-regresjoner:
+Transport- og HTTP-regresjoner:
 
 ```sh
 dotnet build --configuration Release --warnaserror

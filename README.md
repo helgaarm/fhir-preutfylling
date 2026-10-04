@@ -2,7 +2,7 @@
 
 [MIT-lisens](LICENSE) · [Tredjepartsmerknader](THIRD-PARTY-NOTICES.md) · [Lisensgjennomgang](docs/LICENSE_REVIEW.md) · [Sikkerhet og privat rapportering](SECURITY.md) · [Bidra](CONTRIBUTING.md)
 
-En lokal fullstack-app som tar **FHIR R4 Questionnaire (Q)** som JSON, henter **Patient og relevante ressurser fra et FHIR-endepunkt**, evaluerer uttrykkene i Q og lager en **QuestionnaireResponse (QR)**. Bygger videre på den vedlagte arkitekturbeskrivelsen og C#-demokoden.
+En lokal fullstack-app som tar **FHIR R4 Questionnaire (Q)** som JSON, henter **Patient fra en sentral kilde og relevante ressurser fra ett eller flere FHIR-endepunkter**, evaluerer uttrykkene i Q og lager en **QuestionnaireResponse (QR)**. Bygger videre på den vedlagte arkitekturbeskrivelsen og C#-demokoden.
 
 Backend er ASP.NET Core / C# på **.NET 9**, med **Firely Hl7.Fhir.R4 6.6.0**. Frontend er HTML, CSS og JavaScript som serveres av samme app. Du trenger ikke Node, npm, database eller en ekstern FHIR-server for å prøve demoen.
 
@@ -40,11 +40,19 @@ QR har versjonert `questionnaire`, `subject`, ny `id`, `authored`, korrekt `item
 
 ## Bruk din FHIR-testserver
 
+Åpne **Konfigurasjon** øverst i appen for å se, redigere og legge til **kilder**, **populeringsprofiler** og **Questionnaire-versjoner**. Enkle innstillinger har egne felt; ruteregler, pasientbinding og API-begrensninger redigeres som JSON med hjelpetekst. **Valider utkast** kontrollerer hele oppsettet uten å lagre eller kontakte FHIR-kildene. **Lagre og ta i bruk** aktiverer oppsettet for nye kall, og **Last ned JSON** eksporterer utkastet.
+
+GUI-endringer lagres i `.local/fhir-configuration.json` under appens innholdsmappe, utenfor Git og publiserte bygg. Filen overstyrer hele `Fhir`-delen fra appsettings og miljøvariabler ved neste oppstart. Appsettings endres ikke. Se [lagring, tilbakestilling og konfigurasjons-API](docs/FHIR_CONFIGURATION.md#rediger-konfigurasjonen-i-appen).
+
+Velg **Lokal demo · flere endepunkter** for å prøve én sentral pasientkilde og to kliniske endepunkter i samme populering. `Fhir:PopulationProfiles` ruter etter ressurstype, kode, etterspurt profil eller en bestemt søkevariabel. Se [konfigurasjonsveiledningen](docs/FHIR_CONFIGURATION.md) for fullstendige eksempler og [kjørbar fler-kildeforespørsel](examples/populate-request-multi-source.json).
+
+Endepunkter kan også styres **per Questionnaire-URL og eksakt versjon** gjennom `Fhir:QuestionnaireBindings`. Velg **Skjemastyrte kilder · versjon 1/2** i eksempelvelgeren for å prøve dette. Profilen velges automatisk og kan ikke overstyres for registrerte skjemaversjoner. Sett `Fhir:RequireQuestionnaireBinding` til `true` dersom alle skjemaer skal kreve en slik kobling.
+
 For DHG-fasaden er **DHG · Azure Test** allerede tilgjengelig i kildevalget. Velg kilden og en av de to godkjente syntetiske testpersonene; eksemplet **DHG – svangerskap og kontakter** lastes automatisk. Klikk **Hent data og preutfyll** for å gjøre oppslagene. Se [DHG-veiledningen](docs/DHG.md) for kontrakt, kjørbare eksempler og lokal testing uten eksterne kall.
 
 Andre FHIR-testservere med vanlig GET-kontrakt konfigureres slik:
 
-Legg til en kilde i `src/GenericPopulation/appsettings.json` og start appen på nytt:
+Bruk **Konfigurasjon → Kilder → Legg til**. Du kan også legge kilden til i `src/GenericPopulation/appsettings.json` og starte appen på nytt, dersom du ikke har en lagret `.local/fhir-configuration.json` som overstyrer standardene:
 
 ```json
 {
@@ -78,7 +86,7 @@ dotnet run --project src/GenericPopulation
 
 `-MaskInput` krever PowerShell 7.1+. Ved F5 må miljøvariabelen være tilgjengelig for VS Code-prosessen; start eventuelt VS Code fra terminalen der variabelen er satt. Token legges på hvert HTTP-kall, også sidehenting. Utelat `BearerTokenEnvironmentVariable` for kilder uten autentisering. Ikke legg token i Q, frontend, kildekode eller `launch.json`.
 
-Kilder velges fra serverens konfigurasjon. Vilkårlige URL-er fra Q eller API-input godtas ikke. DHG-testkilden bruker `POST _search` med `identifier`/`patient.identifier` i formkroppen. OAuth-pålogging, tokenfornyelse, STS, HelseID, DPoP og X-Patient-Context er ikke implementert; autentisert DHG krever en avtalt tilgangskontrakt og egen adapter. Det er heller ingen automatisk kapabilitetsoppdagelse.
+Kilder velges fra serverens konfigurasjon. Vilkårlige URL-er fra Q eller populeringsforespørsler godtas ikke; endepunkter endres gjennom konfigurasjonen. Alle kilder bruker samme FHIR-klient. DHG-testkilden konfigurerer `POST _search` med `identifier`/`patient.identifier` i formkroppen. OAuth-pålogging, tokenfornyelse, STS, HelseID, DPoP og X-Patient-Context er ikke implementert; autentiserte miljøer krever en avtalt tilgangskontrakt implementert gjennom `IRequestAuthorizer`. Det er ingen automatisk kapabilitetsoppdagelse.
 
 ## API
 
@@ -99,12 +107,17 @@ Kilder velges fra serverens konfigurasjon. Vilkårlige URL-er fra Q eller API-in
 
 Dette er et illustrert utdrag. En komplett kjørbar request ligger i **examples/populate-request.json**.
 
+Bruk `"profileId": "demo-multi"` i stedet for `sourceId` for flere endepunkter. Pasientinput bestemmes av profilens sentrale pasientkilde. `sourceId` beholdes for enkeltkildeklienter; de to valgene kan ikke kombineres.
+
+Når Questionnaire-URL og versjon er registrert, utelates begge valgene: serveren finner profilen fra skjemaet. Se [populate-request-questionnaire.json](examples/populate-request-questionnaire.json). Et motstridende profilvalg eller ukjent versjon av en registrert URL gir HTTP 422 før kildekall. `X-Population-Profile` angir valgt profil i svaret.
+
 For `sourceId: "dhg-test"` brukes `patientIdentifier` (godkjent syntetisk NIN som tekst) i stedet for `patientId`. Begge feltene samtidig avvises. Se **examples/populate-request-dhg.json**. Returnert QR bruker DHGs pseudonyme Patient-ID, og appen kopierer ikke NIN fra requesten til QR.
 
 Svaret er `application/fhir+json` med `resourceType: Parameters` og parameterne:
 
 - `response`: QuestionnaireResponse.
 - `issues`: OperationOutcome med informasjon og eventuelle merknader.
+- `source`: én per brukt kilde, med kilde-ID og antall HTTP-kall/søk, uten pasientverdier.
 
 `X-Fhir-Requests` viser antall kildekall i operasjonen. Kritiske kildefeil returnerer OperationOutcome uten en delvis QR. HTTP 400/415 brukes for ugyldig API-input, 422 for ustøttet Q/kontekst, 502 for kildefeil, 504 for tidsavbrudd og 413 for for stor request.
 
@@ -140,8 +153,8 @@ $r | ConvertTo-Json -Depth 100
 | Kontekst | Én SDC `launchContext`: `patient`, type `Patient` |
 | Variabler | Standard `variable`, på root/item, evaluert i angitt rekkefølge med nedarvet scope |
 | FHIR-søk | `application/x-fhir-query`; relative søk; kun `{{%patient.id}}` som malbinding |
-| Ressurser | Patient read (DHG: POST-søk); søk på Observation, Encounter, CareTeam |
-| Søkeparametere | Obligatorisk `patient`; i tillegg `code`, `category`, `date` for Observation |
+| Ressurser | Sentral Patient read/search; pasientrelaterte R4-ressurser med konfigurert referansesti (standard `subject`) |
+| Søkeparametere | Obligatorisk logisk `patient`; øvrige parametere og API-begrensninger styres per kilde, innen klientens pasientavgrensede søkekontrakt |
 | Initialverdier | `text/fhirpath` via SDC `initialExpression`, eller statisk `initial.value[x]` |
 | Svar | boolean, integer, decimal, date, dateTime, time, string/text, uri, Quantity |
 | Struktur | Ikke-gjentatte grupper og gjentatte spørsmål; display-items utelates fra QR |
@@ -163,12 +176,13 @@ src/GenericPopulation/
   ExpressionEvaluator.cs      Firely FHIRPath
   QuestionnaireGuard.cs       Støtteprofil og strukturkontroller
   AnswerMapper.cs             Bevarer svarenes FHIR-datatyper
-  HttpFhirDataSource.cs        Patient, søk, paginering og størrelsesgrenser
-  DhgFhirDataSource.cs         DHG POST-søk og kontroll av pasientreferanser
+  HttpFhirDataSource.cs        Generisk GET/POST, Patient, paginering og pasientkontroll
   FhirHttpResponse.cs          Felles begrensning og validering av HTTP-svar
-  FhirSourceOptions.cs        Kilderegister og bearer-tokenadapter
+  FhirSourceOptions.cs        Transport, pasientbinding, API-begrensninger og autorisasjon
   FhirSearch.cs               Relativ query-binding og pasientkontroll
-  RoutingFhirDataSource.cs    Gjenbrukbart register for flere kilder
+  RoutingFhirDataSource.cs    Populeringsprofiler, prioriterte regler og kildesporing
+  QuestionnaireProfileRegistry.cs  Profilvalg per Questionnaire-URL og eksakt versjon
+  RoutingSelfTests.cs        Regresjoner for ruting, cache og generisk transport
   FixtureDataSource.cs        Syntetiske demoressurser
   SelfTests.cs                Opprinnelige regresjonstester uten ekstra testrammeverk
   DhgSelfTests.cs              DHG-kontrakt, pasientisolering og feiltilfeller
@@ -177,7 +191,7 @@ examples/                     Q-er, Patient, Observations og eksempelrequest
 verification/                 HTTP-/nettlesertester og testresultater
 ```
 
-Webappen velger én kilde per operasjon. Den medfølgende `RoutingFhirDataSource` kan gjenbrukes ved senere integrasjon med flere kilder innen samme operasjon.
+Webappen velger én populeringsprofil per operasjon. Profilen henter Patient fra én sentral kilde og ruter hvert klinisk søk til ett konfigurert endepunkt. Cachen skiller mellom kilder. Kilder er påkrevde som standard; `OptionalSources` kan tillate manglende data med tydelig advarsel ved utilgjengelighet. Pasientavvik og ugyldige data stopper alltid operasjonen. Det finnes ingen automatisk reservekilde eller sammenslåing av samme søk fra flere endepunkter.
 
 ## Test og publiser lokalt
 

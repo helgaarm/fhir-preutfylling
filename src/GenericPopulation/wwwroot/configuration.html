@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="nb">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Konfigurasjon · FHIR Studio</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/app.css"><link rel="stylesheet" href="/configuration.css">
+  <script src="/configuration.js" defer></script>
+</head>
+<body>
+<header class="topbar"><a class="brand" href="/"><span class="brand-icon">f.</span> FHIR Studio</a><a class="secondary-button" href="/">← Til preutfylling</a></header>
+<main class="configuration-page">
+  <section class="intro"><div><p class="eyebrow">KILDER OG SKJEMAVERSJONER</p><h1>Konfigurasjon</h1><p class="subtitle">Se og endre hvor skjemaene henter data. Endringene tas i bruk når du lagrer.</p></div><span id="config-state" class="status-pill">Laster …</span></section>
+  <section class="card config-toolbar" aria-label="Lagring og kontroll">
+    <div class="config-actions"><button id="config-save" class="primary-button" disabled>Lagre og ta i bruk</button><button id="config-validate" class="secondary-button" disabled>Valider utkast</button><button id="config-reload" class="text-button" disabled>Hent lagret</button><button id="config-export" class="text-button" disabled>Last ned JSON</button></div>
+    <p class="field-help">Endringer valideres samlet før de lagres lokalt. Dette utfører ingen FHIR-oppslag. Tokenverdier vises eller lagres aldri her.</p>
+    <label class="config-checkbox"><input id="config-require-binding" type="checkbox" disabled> Krev registrert Questionnaire-URL og versjon for alle preutfyllinger</label>
+  </section>
+  <div id="config-message" class="message" role="status" aria-live="polite" hidden></div>
+  <div class="config-layout">
+    <aside class="card config-sidebar" aria-label="Velg konfigurasjon">
+      <div class="config-kinds" role="group" aria-label="Konfigurasjonsnivå"><button data-kind="Sources" aria-pressed="true" disabled>Kilder</button><button data-kind="PopulationProfiles" aria-pressed="false" disabled>Profiler</button><button data-kind="QuestionnaireBindings" aria-pressed="false" disabled>Skjemaer</button></div>
+      <div class="config-list-heading"><h2 id="config-list-title">Kilder</h2><button id="config-add" class="text-button" disabled>+ Legg til</button></div>
+      <p id="config-list-help" class="field-help"></p><div id="config-list"></div>
+    </aside>
+    <section class="card config-editor" aria-labelledby="config-editor-title">
+      <div class="panel-heading"><h2 id="config-editor-title">Velg en oppføring</h2><div class="config-actions"><button id="config-duplicate" class="text-button" disabled>Dupliser</button><button id="config-remove" class="text-button" disabled>Fjern fra utkast</button></div></div>
+      <p id="config-empty" class="config-empty">Laster konfigurasjonen …</p>
+      <form id="config-form" novalidate><fieldset id="config-fields" disabled></fieldset></form>
+    </section>
+  </div>
+  <footer><span>Lokal konfigurasjon · <span id="config-storage">.local/fhir-configuration.json</span></span><p>Lagret oppsett brukes ved nye preutfyllinger og neste oppstart. Pågående kall beholder sitt oppsett.</p></footer>
+</main>
+</body></html>

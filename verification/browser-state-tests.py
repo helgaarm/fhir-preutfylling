@@ -23,7 +23,8 @@ async def result_matches_editor(page):
     assert with_page['url'] + '|' + with_page['version'] == CANONICAL
 
 
-async def early_input(page):
+async def early_input(page, registered=False):
+    questionnaire = (ROOT / 'examples/questionnaire-routed-v2.json').read_text(encoding='utf-8') if registered else GENERAL
     release = asyncio.Event()
 
     async def delayed_config(route):
@@ -35,16 +36,26 @@ async def early_input(page):
     page.on('request', lambda request: calls.append(request.url) if request.url.endswith('/api/populate') else None)
     await page.route('**/api/config', delayed_config)
     await page.goto(BASE, wait_until='domcontentloaded')
-    await page.locator('#questionnaire').fill(GENERAL)
+    await page.locator('#questionnaire').fill(questionnaire)
     await page.locator('#questionnaire').press('Control+Enter')
     assert not calls
     release.set()
     for control in CONTROLS:
+        if registered and control == 'source':
+            continue
         await expect(page.locator('#' + control)).to_be_enabled()
     await expect(page.locator('#example')).to_have_value('custom')
-    assert json.loads(await page.locator('#questionnaire').input_value()) == json.loads(GENERAL)
+    assert json.loads(await page.locator('#questionnaire').input_value()) == json.loads(questionnaire)
     await page.locator('#populate').click()
-    await result_matches_editor(page)
+    if registered:
+        await expect(page.locator('#source')).to_have_value('demo-multi')
+        await expect(page.locator('#source')).to_be_disabled()
+        await expect(page.locator('#output-result')).to_be_visible()
+        response = json.loads(await page.locator('#qr-json').text_content())
+        q = json.loads(questionnaire)
+        assert response['questionnaire'] == q['url'] + '|' + q['version']
+    else:
+        await result_matches_editor(page)
 
 
 async def config_failure(page):
@@ -138,6 +149,7 @@ async def stale_response(page, status):
 
 async def main():
     cases = [('Early input survives startup and enables controls', early_input),
+             ('Registered Q pasted during startup selects its bound profile', lambda page: early_input(page, registered=True)),
              ('Failed configuration keeps remote actions disabled', config_failure)]
     for outcome in ('success', 'invalid-json', 'read-error'):
         cases.append(('File read locks controls and recovers: ' + outcome,

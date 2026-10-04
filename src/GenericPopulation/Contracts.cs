@@ -6,7 +6,8 @@ namespace GenericPopulation;
 /// Pasienten og vertens beslutning om preutfylling for én kjøring.
 /// Verten må etablere tilgang før konteksten opprettes; den skal aldri bindes direkte fra HTTP-input.
 /// </summary>
-public sealed record PopulationContext(Patient Patient, bool PrepopulationAllowed);
+public sealed record PopulationContext(Patient Patient, bool PrepopulationAllowed,
+    string? InputIdentifier = null, Uri? PatientBaseUri = null);
 
 /// <summary>En ny QuestionnaireResponse med separate merknader om mangler og tvetydige svar.</summary>
 public sealed record PopulationResult(QuestionnaireResponse Response, OperationOutcome Outcome);
@@ -17,6 +18,12 @@ public sealed record PopulationResult(QuestionnaireResponse Response, OperationO
 /// </summary>
 public interface IFhirDataSource
 {
+    /// <summary>Trygge merknader fra kjøringen, eksempelvis eksplisitt valgfrie kilder som er utilgjengelige.</summary>
+    IReadOnlyList<OperationOutcome.IssueComponent> Issues => [];
+
+    /// <summary>Skiller identiske søk til ulike kilder. Cachen lever bare i én populering.</summary>
+    string CacheKey(FhirSearch search, PopulationContext context) => search.RelativeUrl;
+
     /// <summary>Utfører et pasientavgrenset søk og returnerer et searchset Bundle.</summary>
     Task<Bundle> SearchAsync(FhirSearch search, PopulationContext context,
         CancellationToken cancellationToken);
@@ -31,12 +38,12 @@ public interface IPatientFhirDataSource : IFhirDataSource
     /// <summary>Antall HTTP-kall forsøkt i denne kjøringen, inkludert pasientoppslag og sider.</summary>
     int RequestCount { get; }
 
-    /// <summary>Henter Patient med logisk FHIR-ID eller syntetisk NIN, avhengig av kildemodus.</summary>
+    /// <summary>Henter den sentrale pasienten med konfigurert read- eller search-interaksjon.</summary>
     Task<Patient> ReadPatientAsync(string patientKey, CancellationToken cancellationToken);
 }
 
 /// <summary>
-/// Tilgangspunkt for autorisasjon av hvert utgående GET-kall, også neste side i et søk.
+/// Tilgangspunkt for autorisasjon av hvert utgående HTTP-kall, også neste side i et søk.
 /// Produksjonsintegrasjoner må håndtere riktig audience/scope og eventuelt nytt DPoP-bevis per kall.
 /// </summary>
 public interface IRequestAuthorizer
@@ -50,10 +57,12 @@ public interface IRequestAuthorizer
 /// Forventet feil som verten kan vise som OperationOutcome. Meldingen må være trygg å vise
 /// og skal ikke inneholde pasientverdier, token eller rå feilsvar fra datakilden.
 /// </summary>
-public sealed class PopulationException(string code, string safeMessage)
+public sealed class PopulationException(string code, string safeMessage, int? httpStatus = null)
     : Exception(safeMessage)
 {
     public string Code { get; } = code;
+    /// <summary>Strukturert status for feilregler; ingen rå feilkropp eller pasientdata.</summary>
+    public int? HttpStatus { get; } = httpStatus;
 }
 
 /// <summary>Felles extension-URL-er for variabler og SDC (Structured Data Capture).</summary>

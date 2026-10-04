@@ -4,7 +4,7 @@ using Hl7.Fhir.Serialization;
 namespace GenericPopulation;
 
 /// <summary>
-/// Felles lesing av HTTP-svar for GET- og DHG-klientene: begrenser størrelse, kontrollerer
+/// Felles lesing av HTTP-svar for GET og POST: begrenser størrelse, kontrollerer
 /// innholdstype og deserialiserer FHIR. Rå kildefeil eksponeres ikke for brukeren.
 /// </summary>
 internal static class FhirHttpResponse
@@ -25,7 +25,7 @@ internal static class FhirHttpResponse
     {
         // Feilsvar fra kilden kan inneholde pasientdata eller tilgangsinformasjon.
         if (!response.IsSuccessStatusCode)
-            throw new PopulationException("source-http", "FHIR-kilden svarte med HTTP " + (int)response.StatusCode + ". Kontroller kilde, tilgang og valgt testperson.");
+            throw new PopulationException("source-http", "FHIR-kilden svarte med HTTP " + (int)response.StatusCode + ". Kontroller kilde, tilgang og valgt testperson.", (int)response.StatusCode);
         if (response.Content.Headers.ContentType?.MediaType is not ("application/fhir+json" or "application/json"))
             throw new PopulationException("source-content", "Uventet innholdstype fra FHIR-kilden.");
         if (response.Content.Headers.ContentLength > MaxBytes)

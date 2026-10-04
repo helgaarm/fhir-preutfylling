@@ -7,17 +7,22 @@ using Microsoft.AspNetCore.WebUtilities;
 namespace GenericPopulation;
 
 /// <summary>
-/// Tester DHG-adapterens POST-kontrakt, pasientisolasjon og feilgrenser med syntetiske HTTP-svar.
+/// Tester DHG-konfigurasjonens POST-kontrakt, pasientisolasjon og feilgrenser med syntetiske HTTP-svar.
 /// Kjøres som del av SelfTests; ingen forespørsler når det eksterne DHG-endepunktet.
 /// </summary>
 internal static class DhgSelfTests
 {
     private const string TestIdentifier = "29760484634";
-    private static FhirSourceOptions Options() => new()
+    // Samme konfigurasjon som appen, men testene sender bare til en lokal HttpMessageHandler.
+    internal static FhirSourceOptions Options()
     {
-        Id = "dhg-test", Mode = "dhg-post", BaseUrl = "https://dhg.example/fhir/",
-        AllowedTestPatientIdentifiers = [TestIdentifier, "11859699482", "00000000001"]
-    };
+        var options = new ConfigurationBuilder().SetBasePath(AppContext.BaseDirectory)
+            .AddJsonFile("appsettings.json").Build().GetSection("Fhir:Sources").Get<List<FhirSourceOptions>>()!
+            .Single(s => s.Id == "dhg-test");
+        options.BaseUrl = "https://dhg.example/fhir/";
+        options.AllowedTestPatientIdentifiers.Add("00000000001");
+        return options;
+    }
     private static Bundle BundleOf(params Resource[] resources) => new()
     {
         Type = Bundle.BundleType.Searchset, Total = resources.Length,
@@ -45,7 +50,7 @@ internal static class DhgSelfTests
                 Reply(BundleOf(resources.OfType<Encounter>().ToArray())),
                 Reply(BundleOf(resources.OfType<CareTeam>().ToArray())));
             using var http = new HttpClient(handler);
-            var source = new DhgFhirDataSource(http, Options());
+            var source = new HttpFhirDataSource(http, Options());
             var patient = await source.ReadPatientAsync(TestIdentifier, default);
             var result = await new PopulationEngine(source).CreateAsync(q, new(patient, true));
             Check(source.RequestCount == 4 && handler.Requests.Count == 4, "four requests including cache reuse");
@@ -72,7 +77,7 @@ internal static class DhgSelfTests
         {
             using var handler = new Handler(Reply(BundleOf(DemoFiles.DhgPatient())), Reply(BundleOf()));
             using var http = new HttpClient(handler);
-            var source = new DhgFhirDataSource(http, Options());
+            var source = new HttpFhirDataSource(http, Options());
             var patient = await source.ReadPatientAsync("00000000001", default);
             var code = "urn:example:code|a+b&c";
             await source.SearchAsync(Search(patient, "&code=" + Uri.EscapeDataString(code) + "&category=vital-signs&date=ge2026-09-01"), new(patient, true), default);
@@ -84,7 +89,7 @@ internal static class DhgSelfTests
         {
             using var handler = new Handler();
             using var http = new HttpClient(handler);
-            var source = new DhgFhirDataSource(http, Options());
+            var source = new HttpFhirDataSource(http, Options());
             foreach (var id in new[] { "", "demo-patient", "12345678901", "29760484634\n", "２９７６０４８４６３４", "urn:nin|29760484634" })
                 await Error("patient-context", () => source.ReadPatientAsync(id, default));
             Check(handler.Requests.Count == 0, "no requests");
@@ -93,7 +98,7 @@ internal static class DhgSelfTests
         {
             using var handler = new Handler(Reply(BundleOf()), Reply(BundleOf(DemoFiles.DhgPatient(), DemoFiles.DhgPatient())));
             using var http = new HttpClient(handler);
-            var source = new DhgFhirDataSource(http, Options());
+            var source = new HttpFhirDataSource(http, Options());
             await Error("source-patient-not-found", () => source.ReadPatientAsync(TestIdentifier, default));
             await Error("source-contract", () => source.ReadPatientAsync(TestIdentifier, default));
         }),
@@ -103,7 +108,7 @@ internal static class DhgSelfTests
             {
                 var patient = DemoFiles.DhgPatient(); patient.Id = id;
                 using var http = new HttpClient(new Handler(Reply(BundleOf(patient))));
-                await Error(id == "../other" ? "source-json" : "source-contract", () => new DhgFhirDataSource(http, Options()).ReadPatientAsync(TestIdentifier, default));
+                await Error(id == "../other" ? "source-json" : "source-contract", () => new HttpFhirDataSource(http, Options()).ReadPatientAsync(TestIdentifier, default));
             }
         }),
         ("DHG: feil pasient stoppes for alle støttede ressurser", async () =>
@@ -116,7 +121,7 @@ internal static class DhgSelfTests
             foreach (var resource in wrong)
             {
                 using var http = new HttpClient(new Handler(Reply(BundleOf(DemoFiles.DhgPatient())), Reply(BundleOf(resource))));
-                var source = new DhgFhirDataSource(http, Options());
+                var source = new HttpFhirDataSource(http, Options());
                 var patient = await source.ReadPatientAsync(TestIdentifier, default);
                 await Error("patient-mismatch", () => source.SearchAsync(Search(patient, resource: resource.TypeName), new(patient, true), default));
             }
@@ -124,7 +129,7 @@ internal static class DhgSelfTests
         ("DHG: ukjent ressurstype i søkesvar avvises", async () =>
         {
             using var http = new HttpClient(new Handler(Reply(BundleOf(DemoFiles.DhgPatient())), Reply(BundleOf(DemoFiles.DhgResources().OfType<Encounter>().First()))));
-            var source = new DhgFhirDataSource(http, Options());
+            var source = new HttpFhirDataSource(http, Options());
             var patient = await source.ReadPatientAsync(TestIdentifier, default);
             await Error("source-contract", () => source.SearchAsync(Search(patient), new(patient, true), default));
         }),
@@ -132,7 +137,7 @@ internal static class DhgSelfTests
         {
             using var handler = new Handler(Reply(BundleOf(DemoFiles.DhgPatient())), Reply(BundleOf()));
             using var http = new HttpClient(handler);
-            var source = new DhgFhirDataSource(http, Options());
+            var source = new HttpFhirDataSource(http, Options());
             var patient = await source.ReadPatientAsync(TestIdentifier, default);
             await Error("source-patient-not-found", () => source.ReadPatientAsync("11859699482", default));
             await Error("patient-context", () => source.SearchAsync(Search(patient), new(patient, true), default));
@@ -142,7 +147,7 @@ internal static class DhgSelfTests
         {
             using var handler = new Handler(Reply(BundleOf(DemoFiles.DhgPatient())));
             using var http = new HttpClient(handler);
-            var source = new DhgFhirDataSource(http, Options());
+            var source = new HttpFhirDataSource(http, Options());
             var patient = DemoFiles.DhgPatient();
             await Error("patient-context", () => source.SearchAsync(Search(patient), new(patient, true), default));
             await source.ReadPatientAsync(TestIdentifier, default);
@@ -155,7 +160,7 @@ internal static class DhgSelfTests
         {
             using var handler = new Handler(Reply(BundleOf(DemoFiles.DhgPatient())));
             using var http = new HttpClient(handler);
-            var source = new DhgFhirDataSource(http, Options());
+            var source = new HttpFhirDataSource(http, Options());
             var patient = await source.ReadPatientAsync(TestIdentifier, default);
             foreach (var suffix in new[] { "&date=ge2026-01-01&date=le2026-12-31", "&date=2026-02-30", "&date=sa2026-09-01", "&code=85354-9", "&code=a|b|c", "&category=https://wrong.example|survey" })
                 await Error("query-policy", () => source.SearchAsync(Search(patient, suffix), new(patient, true), default));
@@ -167,7 +172,7 @@ internal static class DhgSelfTests
         {
             using var handler = new Handler(Reply(BundleOf(DemoFiles.DhgPatient())));
             using var http = new HttpClient(handler);
-            var source = new DhgFhirDataSource(http, Options());
+            var source = new HttpFhirDataSource(http, Options());
             var patient = await source.ReadPatientAsync(TestIdentifier, default);
             await Error("query-policy", () => source.SearchAsync(Search(patient, "&category=" + new string('x', 4060)), new(patient, true), default));
             Check(handler.Requests.Count == 1, "oversize form not sent");
@@ -177,7 +182,7 @@ internal static class DhgSelfTests
             foreach (var status in new[] { 400, 401, 403, 404, 429, 503, 302 })
             {
                 using var http = new HttpClient(new Handler(new HttpResponseMessage((HttpStatusCode)status) { Content = new StringContent("sensitive-upstream-diagnostic") }));
-                var error = await Error("source-http", () => new DhgFhirDataSource(http, Options()).ReadPatientAsync(TestIdentifier, default));
+                var error = await Error("source-http", () => new HttpFhirDataSource(http, Options()).ReadPatientAsync(TestIdentifier, default));
                 Check(error.Message.Contains(status.ToString()) && !error.Message.Contains("sensitive"), "safe status only");
             }
         }),
@@ -189,7 +194,7 @@ internal static class DhgSelfTests
             foreach (var (resource, code) in cases)
             {
                 using var http = new HttpClient(new Handler(Reply(resource)));
-                await Error(code, () => new DhgFhirDataSource(http, Options()).ReadPatientAsync(TestIdentifier, default));
+                await Error(code, () => new HttpFhirDataSource(http, Options()).ReadPatientAsync(TestIdentifier, default));
             }
         }),
         ("DHG: delvis Bundle og neste-side-lenke følges ikke", async () =>
@@ -199,7 +204,7 @@ internal static class DhgSelfTests
             var partial = BundleOf(DemoFiles.DhgPatient()); partial.Total = 2;
             using var handler = new Handler(Reply(page), Reply(partial));
             using var http = new HttpClient(handler);
-            var source = new DhgFhirDataSource(http, Options());
+            var source = new HttpFhirDataSource(http, Options());
             await Error("source-paging", () => source.ReadPatientAsync(TestIdentifier, default));
             await Error("source-contract", () => source.ReadPatientAsync(TestIdentifier, default));
             Check(handler.Requests.Count == 2, "no paging calls");
@@ -212,7 +217,7 @@ internal static class DhgSelfTests
             foreach (var (body, contentType, code) in cases)
             {
                 using var http = new HttpClient(new Handler(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(body, Encoding.UTF8, contentType) }));
-                await Error(code, () => new DhgFhirDataSource(http, Options()).ReadPatientAsync(TestIdentifier, default));
+                await Error(code, () => new HttpFhirDataSource(http, Options()).ReadPatientAsync(TestIdentifier, default));
             }
         }),
         ("DHG: kansellering stopper før nettverkskall", async () =>
@@ -220,16 +225,16 @@ internal static class DhgSelfTests
             using var handler = new Handler();
             using var http = new HttpClient(handler);
             using var cts = new CancellationTokenSource(); cts.Cancel();
-            try { await new DhgFhirDataSource(http, Options()).ReadPatientAsync(TestIdentifier, cts.Token); }
+            try { await new HttpFhirDataSource(http, Options()).ReadPatientAsync(TestIdentifier, cts.Token); }
             catch (OperationCanceledException) { Check(handler.Requests.Count == 0, "no requests"); return; }
             throw new InvalidOperationException("expected cancellation");
         }),
-        ("DHG: feil kildemodus og manglende testavgrensning avvises", () =>
+        ("DHG: ugyldig transport og kapabilitetskonfigurasjon avvises", () =>
         {
             var invalid = new[] { Options(), Options(), Options() };
-            invalid[0].Mode = "unsupported";
-            invalid[1].AllowedTestPatientIdentifiers.Clear();
-            invalid[2].BearerTokenEnvironmentVariable = "SHOULD_NOT_BE_USED";
+            invalid[0].SearchMethod = "unsupported";
+            invalid[1].Capabilities.Paging = "unsupported";
+            invalid[2].PatientBinding.ValueFrom = "unsupported";
             foreach (var options in invalid)
             {
                 try { options.Validate(); }

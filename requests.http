@@ -28,3 +28,15 @@ POST {{base}}/api/populate
 Content-Type: application/json
 
 < ./examples/populate-request-dhg.json
+
+### Flere lokale endepunkter med én sentral Patient
+POST {{base}}/api/populate
+Content-Type: application/json
+
+< ./examples/populate-request-multi-source.json
+
+### Endepunkter velges fra Questionnaire-URL og versjon (ingen profileId)
+POST {{base}}/api/populate
+Content-Type: application/json
+
+< ./examples/populate-request-questionnaire.json
