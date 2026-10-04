@@ -109,8 +109,7 @@ public sealed class DhgFhirDataSource : IPatientFhirDataSource
             throw new PopulationException("query-policy", "DHG-søkekroppen kan ikke være større enn 4096 byte.");
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/fhir+json"));
         RequestCount++;
-        using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
-        var resource = await FhirHttpResponse.ReadAsync(response, ct);
+        var resource = await FhirHttpResponse.SendAsync(client, request, ct);
         if (resource is not Bundle { Type: Bundle.BundleType.Searchset } bundle)
             throw new PopulationException("source-contract", "Forventet et searchset Bundle fra DHG.");
         if (bundle.Entry.Count > 2000)

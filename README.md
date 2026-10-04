@@ -199,12 +199,13 @@ dotnet publish src/GenericPopulation -c Release -o publish
 python verification/dhg-http-smoke.py --app-dir publish
 ```
 
-Valgfri nettlesertest (Python og Playwright kreves bare til denne testen):
+Nettlesertester (krever Python og Playwright; kjøres også i CI mot en lokal testkilde):
 
 ```sh
 python -m pip install playwright
 python -m playwright install chromium
 python verification/browser-smoke.py
+python verification/browser-state-tests.py
 ```
 
 CLI med fixtures direkte, uten HTTP:
@@ -230,7 +231,7 @@ Publisert app kjøres fra `publish` slik at appsettings og wwwroot blir funnet. 
 
 Dette er en lokal utviklerapp for **syntetiske/testdata og betrodde Q-definisjoner**. Den har ingen brukerinnlogging eller klinisk tilgangskontroll; Patient-ID er testkontekst. Den lytter på loopback, blokkerer kryssopprinnelses-POST, har ingen CORS-åpning, bruker `no-store`, logger ikke FHIR-data, følger ikke HTTP-redirects og begrenser kildekall til konfigurerte baser. Nettleseren bruker ikke localStorage. FHIRPath-kontrollene er ikke en sandbox for ondsinnede programmer; HTTP-tidsavbrudd avbryter heller ikke et allerede kjørende synkront FHIRPath-uttrykk.
 
-Grenser: 256 KiB API-request, 240 KiB opplastet Q, 200 items, 12 gruppenivåer, 4 000 tegn per FHIRPath, 20 sider per søk, 2 000 ressurser per søk og 2 MiB per kilderespons. HTTP-kall har 20 sekunders tidsgrense, og en operasjon har 60 sekunders kanselleringsfrist.
+Grenser: 256 KiB API-request, 240 KiB opplastet Q, 200 items, 12 gruppenivåer, 4 000 tegn per FHIRPath, 20 sider per søk, 2 000 ressurser per søk og 2 MiB per kilderespons. HTTP-kall har 20 sekunders tidsgrense inkludert lesing av hele svarkroppen, og en operasjon har 60 sekunders kanselleringsfrist.
 
 Bygg, selvtester, HTTP- og nettleserflyt er kontrollert. DHG Test er også verifisert med én preutfylling for hver av de to dokumenterte syntetiske testpersonene. Se **verification/RESULTATER.md**. Autentisert klinisk FHIR-tilgang er ikke verifisert; tilkobling til andre servere og deres tilgangsmodell må testes separat. Demoen er ikke produksjonsklar og skriver ikke tilbake til FHIR-kilden.
 

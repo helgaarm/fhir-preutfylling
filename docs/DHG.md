@@ -70,7 +70,7 @@ Questionnaire bruker fortsatt uttrykk som `Observation?patient={{%patient.id}}&c
 
 Formkroppen begrenses til 4096 byte, hvert svar til 2 MiB og hvert søkeresultat til 2000 ressurser. Et tomt searchset betyr ingen treff; HTTP-feil og OperationOutcome behandles som feil, uten delvis QR. Kildens HTTP-status vises i en kontrollert feilmelding uten rå feilkropp, NIN eller kliniske opplysninger. Redirects følges ikke. Neste-side-lenker avvises fordi POST-kontrakten ikke beskriver paginering.
 
-Oppslagene er ikke en atomisk DHG-transaksjon. Klienten har en grense på 20 sekunder per HTTP-kall og 60 sekunder for hele preutfyllingen, uten automatiske nye forsøk.
+Oppslagene er ikke en atomisk DHG-transaksjon. Klienten har en grense på 20 sekunder per HTTP-kall, inkludert lesing av hele svarkroppen, og 60 sekunder for hele preutfyllingen, uten automatiske nye forsøk.
 
 ## Konfigurasjon og tilgang
 

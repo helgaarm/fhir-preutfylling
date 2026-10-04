@@ -72,8 +72,14 @@ jobs:
             exit 1
           fi
           python3 verification/http-smoke.py
-      - name: Run DHG contract regression tests with synthetic upstream
-        run: python3 verification/dhg-http-smoke.py --app-dir publish
+      - name: Set up browser regression tests
+        run: |
+          python3 -m pip install playwright==1.63.0
+          python3 -m playwright install --with-deps chromium
+      - name: Run DHG and browser regressions with synthetic upstream
+        env:
+          FHIR_SCREENSHOT_DIR: ${{ runner.temp }}/fhir-browser
+        run: python3 verification/dhg-http-smoke.py --app-dir publish --browser
 
   workflow-lint:
     name: Workflow lint

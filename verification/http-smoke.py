@@ -41,9 +41,10 @@ def flat(items):
 with urllib.request.urlopen(BASE + '/licenses', timeout=10) as response:
     license_text = response.read().decode('utf-8').replace('\r\n', '\n')
     check(response.status == 200 and response.headers.get_content_type() == 'text/plain', 'Public license view')
-    legal_files = [ROOT / 'LICENSE', *(ROOT / 'LICENSES').glob('*.txt')]
-    check(all(path.read_text(encoding='utf-8-sig').strip() in license_text for path in legal_files),
-          'Complete copyright, license and terminology notices are served')
+    legal_files = [ROOT / 'LICENSE', ROOT / 'THIRD-PARTY-NOTICES.md', *(ROOT / 'LICENSES').glob('*.txt')]
+    texts = [path.read_text(encoding='utf-8-sig').strip() for path in legal_files]
+    check(all(text and text in license_text for text in texts),
+          'Nonempty, complete copyright, license and third-party notices are served')
 
 # Start med et gyldig skjema og varier deretter input for å kontrollere feiltilfellene.
 q = json.loads((ROOT / 'examples/questionnaire-pregnancy.json').read_text())

@@ -40,7 +40,9 @@ class LicenseCheckTests(unittest.TestCase):
                         'licenseExpression': 'MIT', 'contentHash': 'synthetic-hash', 'copyright': 'Test author',
                         'repository': {'type': 'git', 'url': 'https://example.org/test', 'commit': 'abc'},
                         'legalFiles': ['LICENSES/test.txt'], 'packagedLegalFiles': {'LICENSE.TXT': 'LICENSES/test.txt'}}
-        self.inventory = {'schemaVersion': 1, 'targetFrameworks': {'net9.0': [self.package]},
+        self.inventory = {'schemaVersion': 2, 'targetFrameworks': {'net9.0': [self.package]},
+                          'reviewedDocuments': [{'path': name, 'sha256NormalizedUtf8': checker.text_hash(self.root / name)}
+                                                for name in checker.INTEGRITY_DOCUMENTS],
                           'legalFiles': [{'path': 'LICENSES/test.txt',
                                           'sha256NormalizedUtf8': checker.text_hash(self.root / 'LICENSES/test.txt')}]}
         self.lock = {'dependencies': {'net9.0': {'Test.Package': {
@@ -83,15 +85,53 @@ class LicenseCheckTests(unittest.TestCase):
             checker.verify(self.root)
 
     def test_missing_publish_notice_is_rejected(self):
+        publish = self.publish()
+        self.assertEqual(checker.verify(self.root, publish), 1)
+        (publish / 'LICENSES/test.txt').unlink()
+        with self.assertRaisesRegex(ValueError, 'Publisering mangler'):
+            checker.verify(self.root, publish)
+
+    def publish(self):
         publish = self.root / 'publish'
         for relative in (*checker.DOCUMENTS, 'LICENSES/test.txt'):
             target = publish / relative
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(self.root / relative, target)
-        self.assertEqual(checker.verify(self.root, publish), 1)
-        (publish / 'LICENSES/test.txt').unlink()
-        with self.assertRaisesRegex(ValueError, 'Publisering mangler'):
-            checker.verify(self.root, publish)
+        return publish
+
+    def test_empty_and_truncated_main_documents_are_rejected_in_source_and_publish(self):
+        for name in checker.INTEGRITY_DOCUMENTS:
+            source = self.root / name
+            original = source.read_text(encoding='utf-8')
+            for damaged in ('', ' \n\t', original[:len(original) // 2]):
+                for distributed in (False, True):
+                    with self.subTest(name=name, damaged=damaged, publish=distributed):
+                        try:
+                            source.write_text(damaged, encoding='utf-8')
+                            publish = self.publish() if distributed else None
+                            with self.assertRaisesRegex(ValueError, 'Tomt lisensdokument|Lisensdokument er endret'):
+                                checker.verify(self.root, publish)
+                        finally:
+                            source.write_text(original, encoding='utf-8')
+
+    def test_missing_main_document_integrity_record_is_rejected(self):
+        self.inventory['reviewedDocuments'].pop()
+        self.write_json('LICENSES/inventory.json', self.inventory)
+        with self.assertRaisesRegex(ValueError, 'integritetsgrunnlag'):
+            checker.verify(self.root)
+
+    def test_empty_main_document_cannot_be_approved_by_changing_its_hash(self):
+        (self.root / 'LICENSE').write_text(' \n', encoding='utf-8')
+        self.inventory['reviewedDocuments'][0]['sha256NormalizedUtf8'] = checker.text_hash(self.root / 'LICENSE')
+        self.write_json('LICENSES/inventory.json', self.inventory)
+        with self.assertRaisesRegex(ValueError, 'Tomt lisensdokument'):
+            checker.verify(self.root)
+
+    def test_main_documents_accept_bom_and_windows_line_endings(self):
+        for name in checker.INTEGRITY_DOCUMENTS:
+            file = self.root / name
+            file.write_bytes(b'\xef\xbb\xbf' + file.read_text(encoding='utf-8').replace('\n', '\r\n').encode('utf-8'))
+        self.assertEqual(checker.verify(self.root, self.publish()), 1)
 
 
 if __name__ == '__main__':

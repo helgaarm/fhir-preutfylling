@@ -1,8 +1,18 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "reviewedOn": "2026-10-04",
   "hashNormalization": "UTF-8 without BOM; CRLF/CR normalized to LF; trailing whitespace preserved",
   "scope": "NuGet packages for framework-dependent net9.0; not a complete SBOM for runtimes, containers or development tools",
+  "reviewedDocuments": [
+    {
+      "path": "LICENSE",
+      "sha256NormalizedUtf8": "92c7c2e1a77b25328276e5ad6a4397205a8eecab97a92fd0c8e5ecc2ef11208a"
+    },
+    {
+      "path": "THIRD-PARTY-NOTICES.md",
+      "sha256NormalizedUtf8": "930818a09064d62d5595fcf511cff185c09b612757d9f6e6170b2d6e3135304b"
+    }
+  ],
   "targetFrameworks": {
     "net9.0": [
       {

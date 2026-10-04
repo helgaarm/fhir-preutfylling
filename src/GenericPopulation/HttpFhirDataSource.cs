@@ -73,8 +73,7 @@ public sealed class HttpFhirDataSource(
         request.Headers.TryAddWithoutValidation("Prefer", "handling=strict");
         await authorizer.AuthorizeAsync(request, context, ct);
         RequestCount++;
-        using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
-        return await FhirHttpResponse.ReadAsync(response, ct);
+        return await FhirHttpResponse.SendAsync(client, request, ct);
     }
 
     // Samme protokoll, vert, port og basesti som den serverkonfigurerte FHIR-kilden.
