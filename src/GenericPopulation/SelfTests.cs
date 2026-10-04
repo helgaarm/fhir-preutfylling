@@ -240,6 +240,7 @@ public static class SelfTests
         cases.AddRange(RoutingSelfTests.Cases());
         cases.AddRange(QuestionnaireRoutingSelfTests.Cases());
         cases.AddRange(ConfigurationSelfTests.Cases());
+        cases.AddRange(EndpointConnectivitySelfTests.Cases());
         var failed = 0;
         foreach (var (name, test) in cases)
         {

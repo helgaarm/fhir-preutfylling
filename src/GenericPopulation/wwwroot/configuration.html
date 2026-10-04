@@ -5,16 +5,28 @@
   <title>Konfigurasjon · FHIR Studio</title>
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/app.css"><link rel="stylesheet" href="/configuration.css">
-  <script src="/configuration.js" defer></script>
+  <script src="/endpoint-status.js" defer></script><script src="/configuration.js" defer></script>
 </head>
 <body>
 <header class="topbar"><a class="brand" href="/"><span class="brand-icon">f.</span> FHIR Studio</a><a class="secondary-button" href="/">← Til preutfylling</a></header>
 <main class="configuration-page">
   <section class="intro"><div><p class="eyebrow">KILDER OG SKJEMAVERSJONER</p><h1>Konfigurasjon</h1><p class="subtitle">Se og endre hvor skjemaene henter data. Endringene tas i bruk når du lagrer.</p></div><span id="config-state" class="status-pill">Laster …</span></section>
+  <section class="card config-guide" aria-labelledby="config-guide-title">
+    <h2 id="config-guide-title">Slik henger oppsettet sammen</h2>
+    <ol class="config-guide-steps">
+      <li><h3>Kilder <span>Hvor finnes dataene?</span></h3><p>Én kilde er én FHIR-server. Her angir du adressen, hvordan pasienten finnes og hvilke søk serveren støtter.</p></li>
+      <li><h3>Profiler <span>Hvilke kilder skal brukes?</span></h3><p>En populeringsprofil velger én kilde for pasienten og kilder for resten av dataene. Med én kilde kan du bruke profilen som opprettes automatisk.</p></li>
+      <li><h3>Skjemaer <span>Når velges profilen?</span></h3><p>Koble skjemaets URL og versjon til en profil for automatisk valg. Helt uregistrerte testskjemaer kan bruke manuelt profilvalg når kravet nedenfor er av.</p></li>
+    </ol>
+    <details class="config-guide-start"><summary>Kom i gang med en ny FHIR-kilde</summary><ol><li>Velg <strong>Kilder → Legg til</strong>. Angi en unik ID, et navn og FHIR-base URL.</li><li>Behold <strong>Vis også som enkeltkildeprofil</strong> hvis alle data skal hentes fra denne kilden. Tilpass pasientoppslag og søk til serveren.</li><li>Hvis data ligger flere steder, opprett en <strong>profil</strong> og velg sentral pasientkilde, standardkilde og ruteregler.</li><li>Registrer eventuelt skjemaets URL og versjon under <strong>Skjemaer</strong>. Velg <strong>Valider utkast</strong>, deretter <strong>Lagre og ta i bruk</strong>.</li><li>Åpne preutfyllingssiden på nytt. Velg profilen og en syntetisk testpasient for å prøve oppsettet.</li></ol></details>
+  </section>
   <section class="card config-toolbar" aria-label="Lagring og kontroll">
-    <div class="config-actions"><button id="config-save" class="primary-button" disabled>Lagre og ta i bruk</button><button id="config-validate" class="secondary-button" disabled>Valider utkast</button><button id="config-reload" class="text-button" disabled>Hent lagret</button><button id="config-export" class="text-button" disabled>Last ned JSON</button></div>
-    <p class="field-help">Endringer valideres samlet før de lagres lokalt. Dette utfører ingen FHIR-oppslag. Tokenverdier vises eller lagres aldri her.</p>
-    <label class="config-checkbox"><input id="config-require-binding" type="checkbox" disabled> Krev registrert Questionnaire-URL og versjon for alle preutfyllinger</label>
+    <div class="config-actions"><button id="config-save" class="primary-button" disabled>Lagre og ta i bruk</button><button id="config-validate" class="secondary-button" disabled>Valider utkast</button><button id="config-preview" class="secondary-button" aria-haspopup="dialog" aria-controls="config-json-dialog" disabled>Vis JSON</button><button id="config-reload" class="text-button" disabled>Hent lagret</button><button id="config-export" class="text-button" disabled>Last ned JSON</button></div>
+    <p class="field-help"><strong>Valider utkast</strong> kontrollerer felter og koblinger uten å lagre. <strong>Lagre og ta i bruk</strong> aktiverer hele utkastet. Ingen av dem kontakter FHIR-kildene eller tester tilkoblingen.</p>
+    <p class="field-help"><strong>Hent lagret</strong> forkaster ulagrede endringer etter bekreftelse. <strong>Last ned JSON</strong> eksporterer utkastet, også det som ikke er lagret.</p>
+    <p class="field-help"><strong>Vis JSON</strong> åpner hele konfigurasjonsutkastet i et lesevindu, inkludert ulagrede endringer.</p>
+    <label class="config-checkbox"><input id="config-require-binding" type="checkbox" aria-describedby="require-binding-help" disabled> Krev registrert Questionnaire-URL og versjon for alle preutfyllinger</label>
+    <p id="require-binding-help" class="field-help">På: bare skjemaversjoner registrert under Skjemaer kan brukes. Av: helt uregistrerte skjemaer kan velge profil manuelt. Er URL-en allerede registrert, må hver versjon registreres uansett.</p>
   </section>
   <div id="config-message" class="message" role="status" aria-live="polite" hidden></div>
   <div class="config-layout">
@@ -25,10 +37,16 @@
     </aside>
     <section class="card config-editor" aria-labelledby="config-editor-title">
       <div class="panel-heading"><h2 id="config-editor-title">Velg en oppføring</h2><div class="config-actions"><button id="config-duplicate" class="text-button" disabled>Dupliser</button><button id="config-remove" class="text-button" disabled>Fjern fra utkast</button></div></div>
+      <div id="config-endpoint-check" class="config-endpoint-check" hidden><p>Test kontakt med den lagrede kilden, uten token eller pasientoppslag. Lagre eventuelle endringer før du tester.</p><div id="config-endpoint-status"></div></div>
       <p id="config-empty" class="config-empty">Laster konfigurasjonen …</p>
       <form id="config-form" novalidate><fieldset id="config-fields" disabled></fieldset></form>
     </section>
   </div>
   <footer><span>Lokal konfigurasjon · <span id="config-storage">.local/fhir-configuration.json</span></span><p>Lagret oppsett brukes ved nye preutfyllinger og neste oppstart. Pågående kall beholder sitt oppsett.</p></footer>
 </main>
+<dialog id="config-json-dialog" class="config-json-dialog" aria-labelledby="config-json-title" aria-describedby="config-json-description">
+  <div class="config-json-heading"><h2 id="config-json-title">Konfigurasjon som JSON</h2><button id="config-json-close" class="secondary-button" type="button" autofocus>Lukk</button></div>
+  <p id="config-json-description"></p>
+  <pre id="config-json-content" tabindex="0" role="region" aria-label="Konfigurasjon som JSON"><code id="config-json-code"></code></pre>
+</dialog>
 </body></html>

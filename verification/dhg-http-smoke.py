@@ -58,6 +58,15 @@ class DhgMock(BaseHTTPRequestHandler):
         self.calls.append(('GET', self.path, {}))
         self.send_json({'resourceType': 'OperationOutcome'}, 405)
 
+    def do_HEAD(self):
+        self.calls.append(('HEAD', self.path, {}))
+        assert not self.headers.get('Authorization') and not self.headers.get('Content-Length')
+        status = {'status-auth': 401, 'status-missing': 404, 'status-redirect': 302, 'status-error': 503}.get(self.mode, 204)
+        self.send_response(status)
+        if status == 302:
+            self.send_header('Location', '/must-not-follow')
+        self.end_headers()
+
     def do_POST(self):
         raw = self.rfile.read(int(self.headers.get('Content-Length', 0)))
         form = urllib.parse.parse_qs(raw.decode('utf-8'), strict_parsing=True)
@@ -178,6 +187,33 @@ def main():
             check(source['patientInput'] == 'identifier' and source['testPatientIdentifiers'] == IDENTIFIERS,
                   'DHG source exposes only configured synthetic patient choices')
             check(not DhgMock.calls, 'No DHG requests on startup or config read')
+            probe = {'configurationRevision': config['revision']}
+            for mode, expected_state, expected_http in [('normal', 'ok', 204), ('status-auth', 'warning', 401),
+                    ('status-missing', 'warning', 404), ('status-redirect', 'warning', 302), ('status-error', 'error', 503)]:
+                DhgMock.mode = mode
+                before_probe = len(DhgMock.calls)
+                status, result, result_headers = call('/api/sources/dhg-test/status', probe)
+                check(status == 200 and result['state'] == expected_state and result['httpStatus'] == expected_http
+                      and result['checkedAt'] and result_headers['Cache-Control'] == 'no-store'
+                      and DhgMock.calls[before_probe:] == [('HEAD', '/fhir/', {})],
+                      f'Endpoint check: {mode}, one anonymous HEAD without redirects or patient data')
+            before_probe = len(DhgMock.calls)
+            for label, path, payload, custom_headers, expected in [
+                ('stale revision', '/api/sources/dhg-test/status', {'configurationRevision': 'old'}, {}, 409),
+                ('unknown source', '/api/sources/missing/status', probe, {}, 404),
+                ('custom URL', '/api/sources/dhg-test/status', {**probe, 'url': 'https://other.example/'}, {}, 400),
+                ('missing revision', '/api/sources/dhg-test/status', {}, {}, 400),
+                ('wrong content type', '/api/sources/dhg-test/status', probe, {'Content-Type': 'text/plain'}, 415),
+                ('cross-origin', '/api/sources/dhg-test/status', probe, {'Origin': 'https://other.example'}, 403),
+                ('cross-site', '/api/sources/dhg-test/status', probe, {'Sec-Fetch-Site': 'cross-site'}, 403),
+            ]:
+                check(call(path, payload, headers=custom_headers)[0] == expected and len(DhgMock.calls) == before_probe,
+                      f'Endpoint check rejects {label} before contacting source')
+            duplicate_probe = json.dumps(probe)[:-1] + ', "configurationRevision": "other"}'
+            check(call('/api/sources/dhg-test/status', raw=duplicate_probe.encode())[0] == 400
+                  and len(DhgMock.calls) == before_probe, 'Endpoint check rejects duplicate revision')
+            DhgMock.mode = 'normal'
+            DhgMock.calls.clear()
             status, example, _ = call('/api/examples/dhg')
             check(status == 200 and example['id'] == 'dhg-demo', 'DHG example available in app')
             body = {'sourceId': 'dhg-test', 'patientIdentifier': IDENTIFIERS[0], 'questionnaire': QUESTIONNAIRE}

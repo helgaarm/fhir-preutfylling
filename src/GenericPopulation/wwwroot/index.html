@@ -4,7 +4,7 @@
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <title>FHIR Studio · Preutfylling</title>
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="/app.css"><script src="/app.js" defer></script>
+  <link rel="stylesheet" href="/app.css"><script src="/endpoint-status.js" defer></script><script src="/app.js" defer></script>
 </head>
 <!-- Statisk struktur for testappen. app.js binder hendelser via id og fyller data med textContent.
      CSS styrer utseendet; hidden og ARIA-attributter styres av app.js ved tilstands- og fanebytte.
@@ -13,7 +13,15 @@
 <header class="topbar"><a class="brand" href="/"><span class="brand-icon">f.</span> FHIR Studio <span class="brand-divider"></span><span class="brand-caption">Preutfylling</span></a><nav class="topbar-actions" aria-label="App"><a class="text-button" href="/configuration.html">Konfigurasjon</a><span class="badge"><span class="dot"></span> Lokal testapp <span class="badge-version">R4</span></span></nav></header>
 <main>
   <section class="intro"><div><p class="eyebrow">QUESTIONNAIRE → QUESTIONNAIRE RESPONSE</p><h1>Fra skjema til utfylt svar.</h1><p class="subtitle">La skjemaet beskrive databehovet. Hent FHIR-data og se resultatet.</p></div><div class="flow" aria-label="Flyt: Questionnaire, FHIR-kilde, QuestionnaireResponse"><span>Q</span><i>→</i><span class="flow-source">FHIR</span><i>→</i><span class="flow-result">QR</span></div></section>
-  <section class="connection card" aria-labelledby="connection-title"><div class="section-label"><span class="step">01</span><h2 id="connection-title">Datakilde</h2><span class="subtle">Kontekst for oppslaget</span></div><div class="connection-fields"><div class="field source-field"><label for="source">Populeringsprofil</label><select id="source" aria-describedby="profile-help" disabled></select><span id="profile-help" class="field-help"></span><span id="endpoint" class="field-help mono"></span></div><div class="field patient-field"><label id="patient-label" for="patient">Patient-ID</label><input id="patient" value="demo-patient" maxlength="64" spellcheck="false" autocomplete="off" aria-describedby="patient-help"><select id="test-patient" aria-describedby="patient-help" hidden></select><span id="patient-help" class="field-help">Logisk ressurs-ID, for eksempel demo-patient.</span></div><div class="connection-note"><span class="note-symbol">i</span><p>Bruk syntetiske testdata.<br><span>Profiler og kilder kan redigeres under Konfigurasjon.</span></p></div></div></section>
+  <section class="connection card" aria-labelledby="connection-title">
+    <div class="section-label"><span class="step">01</span><h2 id="connection-title">Datakilde</h2><span class="subtle">Kontekst for oppslaget</span></div>
+    <div class="connection-fields">
+      <div class="field source-field"><label for="source">Populeringsprofil</label><select id="source" aria-describedby="profile-help" disabled></select><span id="profile-help" class="field-help"></span></div>
+      <div class="field patient-field"><label id="patient-label" for="patient">Patient-ID</label><input id="patient" value="demo-patient" maxlength="64" spellcheck="false" autocomplete="off" aria-describedby="patient-help"><select id="test-patient" aria-describedby="patient-help" hidden></select><span id="patient-help" class="field-help">Logisk ressurs-ID, for eksempel demo-patient.</span></div>
+      <div class="connection-note"><span class="note-symbol" aria-hidden="true">i</span><p>Bruk syntetiske testdata.<br><a href="/configuration.html">Endre profiler og kilder</a></p></div>
+    </div>
+    <div class="connection-endpoints"><span id="endpoint-label">Kilder i valgt profil</span><ul id="endpoint" aria-labelledby="endpoint-label"></ul><p class="endpoint-check-help">Test tilkobling sjekker kontakt med serveren uten pasientoppslag. Statusen gjelder siste kontroll, ikke tilgang til FHIR-data.</p></div>
+  </section>
   <!-- Editor og resultat er separate paneler, slik at originalskjema og genererte svar ikke blandes. -->
   <div class="workspace">
     <section class="card input-card" aria-labelledby="input-title"><div class="panel-heading"><div class="section-label"><span class="step">02</span><h2 id="input-title">Questionnaire</h2><span class="tag">INPUT</span></div><button id="upload" class="text-button" disabled>↑ Last opp JSON</button><input id="file" type="file" accept=".json,application/json,application/fhir+json" hidden></div>

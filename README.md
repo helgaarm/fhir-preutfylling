@@ -24,6 +24,10 @@ dotnet run --project src/GenericPopulation
 
 Stopp med Ctrl+C. VS Code har også en `self-test`-task og en egen feilsøkingskonfigurasjon for selvtestene. Sett gjerne et breakpoint i `PopulationEngine.CreateAsync` eller `HttpFhirDataSource.ReadPatientAsync`.
 
+Start webappen fra en vanlig terminal med nettverkstilgang når eksterne FHIR-kilder er konfigurert. En bakgrunnsprosess arver proxyinnstillinger fra miljøet som starter den. Appen stopper nå med en konkret forklaring hvis den oppdager en lokal sperreproxy på port 9 for en ekstern kilde. Start da fra en vanlig terminal eller en godkjent prosess med nettverkstilgang. Appen endrer ikke proxyinnstillinger eller sertifikatkontroll. Selvtester og rene lokale testmiljøer kan fortsatt kjøres uten ekstern tilgang.
+
+**Test tilkobling** ved hver kilde på framsiden og under **Konfigurasjon → Kilder** viser et statuslys med tekst og tidspunkt. Kontrollen gjør én anonym HEAD-forespørsel til lagret FHIR-base, med fem sekunders tidsfrist, uten pasientoppslag, token eller omdirigeringer. Grønt betyr et vellykket HTTP-svar; gult betyr for eksempel krav om tilgang eller en adresse som ikke støtter kontrollen (404/405); rødt betyr nettverksfeil, tidsavbrudd eller serverfeil. Grått betyr at kilden ikke er sjekket eller at resultatet er over ett minutt gammelt. Kontrollen bekrefter ikke tilgang til FHIR-data. Den kjører bare når du trykker på knappen; ulagrede kildeendringer må lagres først.
+
 ## Prøv hele flyten
 
 Nettleseren laster svangerskapseksemplet som standard. Du kan bytte til personopplysninger, lime inn en egen Q eller laste opp en `.json`-fil. **Egen Q må følge støtteprofilen nedenfor**, inkludert uttrykk som beskriver databehovet; motoren utleder ikke datakoblinger fra spørsmålets tekst.

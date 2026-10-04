@@ -6,6 +6,7 @@ const $ = id => document.getElementById(id);
 // config kommer fra /api/config; envelope er Parameters med QR + OperationOutcome; qr er selve svaret.
 let config, envelope, qr, busy = false, initializing = true, inputRevision = 0;
 let profileLocked = false, profileError = '';
+let endpointChecks = [];
 const flatten = items => (items || []).flatMap(item => [item, ...flatten(item.item)]);
 const pretty = value => JSON.stringify(value, null, 2);
 const selectedSource = () => config?.profiles.find(s => s.id === $('source').value);
@@ -47,7 +48,17 @@ function setBusy(value, activity = 'populate') {
 function renderSource() {
   const source = selectedSource();
   const identifier = usesIdentifier(), testList = usesTestList();
-  $('endpoint').textContent = (source?.endpoints || []).map(s => `${s.name}: ${s.baseUrl}`).join(' · ');
+  endpointChecks.forEach(check => check.destroy()); endpointChecks = [];
+  $('endpoint').replaceChildren();
+  for (const endpoint of source?.endpoints || []) {
+    const row = element('li');
+    const identity = element('div', 'endpoint-identity');
+    identity.append(element('span', 'endpoint-name', endpoint.name), element('span', 'mono', endpoint.baseUrl));
+    const status = element('div');
+    endpointChecks.push(new EndpointStatusControl(status, endpoint.id, config.revision));
+    row.append(identity, status);
+    $('endpoint').append(row);
+  }
   $('patient').hidden = testList;
   $('patient').maxLength = identifier ? 256 : 64;
   $('test-patient').hidden = !testList;
