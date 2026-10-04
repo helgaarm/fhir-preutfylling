@@ -10,6 +10,7 @@ import json
 import os
 from pathlib import Path
 import socket
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -120,7 +121,10 @@ def main():
         count += 1
         print('PASS:', name)
 
-    with ThreadingHTTPServer(('127.0.0.1', 0), DhgMock) as upstream, tempfile.TemporaryFile() as app_log:
+    with ThreadingHTTPServer(('127.0.0.1', 0), DhgMock) as upstream, tempfile.TemporaryFile() as app_log, \
+            tempfile.TemporaryDirectory(prefix='fhir-http-test-') as isolated:
+        # Konfigurasjonstester skriver bare i denne kopien. Ingen lokale utviklerinnstillinger følger med.
+        app_dir = Path(shutil.copytree(app_dir, Path(isolated) / 'app', ignore=shutil.ignore_patterns('.local')))
         thread = threading.Thread(target=upstream.serve_forever, daemon=True)
         thread.start()
         with socket.socket() as reserve:
@@ -136,16 +140,20 @@ def main():
             'Demo__Port': str(app_port),
             'Fhir__Sources__0__BaseUrl': base + '/demo/fhir/',
             'Fhir__Sources__1__BaseUrl': f'http://127.0.0.1:{upstream.server_port}/fhir/',
+            'Fhir__Sources__2__BaseUrl': base + '/demo/vitals/',
+            'Fhir__QuestionnaireBindings__2__Questionnaire': 'urn:test:registered-dhg',
+            'Fhir__QuestionnaireBindings__2__Version': '1.0.0',
+            'Fhir__QuestionnaireBindings__2__ProfileId': 'dhg-test',
         })
         app = subprocess.Popen(['dotnet', 'GenericPopulation.dll'], cwd=app_dir, env=env,
                                stdout=app_log, stderr=subprocess.STDOUT)
         # Lokale testkall skal ikke gå gjennom maskinens eventuelle proxy.
         opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 
-        def call(path, body=None, raw=None):
+        def call(path, body=None, raw=None, headers=None):
             data = raw if raw is not None else json.dumps(body).encode() if body is not None else None
             req = urllib.request.Request(base + path, data=data,
-                                         headers={'Content-Type': 'application/json'} if data is not None else {})
+                                         headers={**({'Content-Type': 'application/json'} if data is not None else {}), **(headers or {})})
             try:
                 response = opener.open(req, timeout=10)
             except urllib.error.HTTPError as error:
@@ -208,10 +216,89 @@ def main():
                       'Controlled failure without partial QR: ' + mode)
                 check('must-not-leak' not in json.dumps(error) and IDENTIFIERS[0] not in json.dumps(error), 'No upstream diagnostic or NIN in error: ' + mode)
             check(not any(method == 'GET' for method, _, _ in DhgMock.calls), 'Redirect was not followed')
+            # En sentral Patient og to forskjellige kliniske endepunkter, uten DHG-kall.
+            before = len(DhgMock.calls)
+            multi_body = {'profileId': 'demo-multi', 'patientId': 'demo-patient',
+                          'questionnaire': json.loads((ROOT / 'examples/questionnaire-pregnancy.json').read_text(encoding='utf-8'))}
+            status, multi, headers = call('/api/populate', multi_body)
+            check(status == 200 and headers['X-Fhir-Requests'] == '3', 'Multi-source profile with one central Patient lookup')
+            stats = {next(part['valueString'] for part in p['part'] if part['name'] == 'id'):
+                     next(part['valueInteger'] for part in p['part'] if part['name'] == 'requests')
+                     for p in multi['parameter'] if p['name'] == 'source'}
+            check(stats == {'demo': 2, 'demo-vitals': 1} and len(DhgMock.calls) == before,
+                  'Configured routes use exactly the intended endpoints')
+            response = next(p['resource'] for p in multi['parameter'] if p['name'] == 'response')
+            items = {item['linkId']: item for item in flat(response['item'])}
+            check(items['systolic']['answer'][0]['valueQuantity']['value'] == 128 and
+                  items['gestationalAge']['answer'][0]['valueQuantity']['value'] == 210, 'Values from both endpoints reach QR')
+            for invalid in ({**multi_body, 'sourceId': 'demo'}, {**multi_body, 'profileId': 'missing'},
+                            {**multi_body, 'routes': []}):
+                check(call('/api/populate', invalid)[0] == 400, 'Reject ambiguous or client-controlled profile selection')
+            # Samme canonical, to versjoner. Profilvalg kan utelates, og manuelt valg kan ikke overstyre koblingen.
+            for version, expected_profile, expected_sources in ((1, 'demo', {'demo'}), (2, 'demo-multi', {'demo', 'demo-vitals'})):
+                q = json.loads((ROOT / f'examples/questionnaire-routed-v{version}.json').read_text(encoding='utf-8'))
+                routed_body = {'patientId': 'demo-patient', 'questionnaire': q}
+                status, routed, headers = call('/api/populate', routed_body)
+                check(status == 200 and headers['X-Population-Profile'] == expected_profile,
+                      f'Questionnaire version {version} selects configured profile without client choice')
+                ids = {part['valueString'] for p in routed['parameter'] if p['name'] == 'source'
+                       for part in p['part'] if part['name'] == 'id'}
+                check(ids == expected_sources, f'Questionnaire version {version} uses correct endpoints')
+            check(call('/api/populate', {**routed_body, 'profileId': 'demo'})[0] == 422, 'Reject profile override for registered version')
+            check(call('/api/populate', {**routed_body, 'sourceId': 'demo'})[0] == 422, 'Legacy sourceId cannot bypass questionnaire binding')
+            check(call('/api/populate', {**routed_body, 'profileId': 'demo-multi'})[0] == 200, 'Matching explicit profile remains compatible')
+            status, direct, headers = call('/api/questionnaire-response', routed_body)
+            check(status == 200 and direct['questionnaire'].endswith('|2.0.0') and headers['X-Population-Profile'] == 'demo-multi',
+                  'Direct QR endpoint also resolves questionnaire version')
+            registered_dhg = {**QUESTIONNAIRE, 'url': 'urn:test:registered-dhg'}
+            before = len(DhgMock.calls)
+            for q, extra in ((registered_dhg, {'profileId': 'demo'}),
+                             ({**registered_dhg, 'version': 'unknown'}, {})):
+                status, error, _ = call('/api/populate', {'questionnaire': q, 'patientIdentifier': IDENTIFIERS[0], **extra})
+                check(status == 422 and error['issue'][0]['diagnostics'] == 'questionnaire-routing' and len(DhgMock.calls) == before,
+                      'Unknown version or conflicting profile rejected before central Patient lookup')
+            # Redigerbart oppsett er ett atomisk dokument; validering, konflikter og opprinnelse kontrolleres i HTTP-grensen.
+            before = len(DhgMock.calls)
+            status, original, config_headers = call('/api/configuration')
+            check(status == 200 and config_headers['Cache-Control'] == 'no-store', 'Configuration is readable without browser caching')
+            check(original['revision'] == config['revision'] and original['configuration']['Sources'][0]['Id'] == 'demo',
+                  'Configuration editor and population page share a revision')
+            update = {'revision': original['revision'], 'configuration': copy.deepcopy(original['configuration'])}
+            update['configuration']['Sources'][0]['Name'] = 'Updated local demo'
+            check(call('/api/configuration/validate', update)[0] == 200 and not (app_dir / '.local').exists(),
+                  'Draft validation does not persist or activate changes')
+            check(call('/api/configuration')[1] == original, 'Validation retains original snapshot')
+            invalid = copy.deepcopy(update)
+            invalid['configuration']['QuestionnaireBindings'][0]['ProfileId'] = 'missing-profile'
+            check(call('/api/configuration', invalid)[0] == 422 and call('/api/configuration')[1] == original,
+                  'Invalid references cannot be saved or activated')
+            check(call('/api/configuration', update, headers={'Origin': 'https://untrusted.example'})[0] == 403,
+                  'Cross-origin configuration edits are rejected')
+            check(call('/api/configuration', update, headers={'Sec-Fetch-Site': 'cross-site'})[0] == 403,
+                  'Cross-site configuration edits are rejected without Origin too')
+            check(call('/api/configuration', update, headers={'Content-Type': 'text/plain'})[0] == 415,
+                  'Configuration edits require JSON content type')
+            check(call('/api/configuration', {**update, 'path': 'elsewhere.json'})[0] == 400,
+                  'Clients cannot choose configuration storage paths')
+            status, saved, _ = call('/api/configuration', update)
+            check(status == 200 and saved['revision'] != original['revision'], 'Save returns a new revision')
+            persisted = json.loads((app_dir / '.local/fhir-configuration.json').read_text(encoding='utf-8'))
+            check(persisted == saved['configuration'] and persisted['Sources'][0]['Name'] == 'Updated local demo',
+                  'Saved file matches active configuration')
+            check(call('/api/config')[1]['profiles'][0]['name'] == 'Updated local demo', 'New settings reach population page immediately')
+            check(call('/api/configuration', update)[0] == 409 and call('/api/configuration')[1] == saved,
+                  'Stale browser cannot overwrite saved settings')
+            check(call('/api/populate', {**body, 'configurationRevision': original['revision']})[0] == 409 and len(DhgMock.calls) == before,
+                  'Stale population settings are rejected before any Patient lookup')
+            check(call('/api/populate', {**multi_body, 'configurationRevision': saved['revision']})[0] == 200,
+                  'Population with current revision works')
+            # Tilbakestill før eksisterende GUI-regresjoner. Kopien fjernes når prosessen har stoppet.
+            check(call('/api/configuration', {'revision': saved['revision'], 'configuration': original['configuration']})[0] == 200,
+                  'Previous settings can be restored explicitly')
             if args.browser:
                 DhgMock.mode = 'normal'
                 browser_env = dict(env, FHIR_TEST_BASE_URL=base, FHIR_TEST_DHG_MOCK='true')
-                for script in ('browser-smoke.py', 'browser-state-tests.py'):
+                for script in ('browser-smoke.py', 'browser-state-tests.py', 'browser-configuration-tests.py'):
                     subprocess.run([sys.executable, '-X', 'utf8', str(ROOT / 'verification' / script)],
                                    cwd=ROOT, env=browser_env, check=True, timeout=120)
         finally:

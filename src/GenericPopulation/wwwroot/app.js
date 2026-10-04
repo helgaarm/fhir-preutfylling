@@ -5,12 +5,14 @@
 const $ = id => document.getElementById(id);
 // config kommer fra /api/config; envelope er Parameters med QR + OperationOutcome; qr er selve svaret.
 let config, envelope, qr, busy = false, initializing = true, inputRevision = 0;
+let profileLocked = false, profileError = '';
 const flatten = items => (items || []).flatMap(item => [item, ...flatten(item.item)]);
 const pretty = value => JSON.stringify(value, null, 2);
-const selectedSource = () => config?.sources.find(s => s.id === $('source').value);
-// GET-kilder bruker en logisk Patient-ID. DHG bruker en syntetisk identifikator fra serverens testliste.
-const isDhg = () => selectedSource()?.patientInput === 'identifier';
-const patientKey = () => isDhg() ? $('test-patient').value : $('patient').value.trim();
+const selectedSource = () => config?.profiles.find(s => s.id === $('source').value);
+// Den sentrale pasientkildens konfigurasjon avgjør input; rutingen skjer på serveren.
+const usesIdentifier = () => selectedSource()?.patientInput === 'identifier';
+const usesTestList = () => usesIdentifier() && !!selectedSource()?.testPatientIdentifiers?.length;
+const patientKey = () => usesTestList() ? $('test-patient').value : $('patient').value.trim();
 function message(text, error = false) {
   $('message').textContent = text;
   $('message').classList.toggle('error', error);
@@ -29,6 +31,8 @@ function setBusy(value, activity = 'populate') {
   busy = value;
   for (const id of ['populate', 'source', 'patient', 'test-patient', 'example', 'upload', 'file'])
     $(id).disabled = value || initializing || !config;
+  $('source').disabled ||= profileLocked;
+  $('populate').disabled ||= !!profileError;
   // Eget skjema kan redigeres mens konfigurasjonen lastes, også hvis oppstarten feiler.
   for (const id of ['format', 'questionnaire']) $(id).disabled = value;
   $('run-label').textContent = value ? (activity === 'questionnaire' ? 'Leser skjema …' : 'Preutfyller …') : 'Hent data og preutfyll';
@@ -39,29 +43,53 @@ function setBusy(value, activity = 'populate') {
   $('output-empty').hidden = value || !!qr;
   $('output-result').hidden = value || !qr;
 }
-/** Tilpass pasientvelger og eksempel til kilden. Et eget redigert skjema beholdes ved kildebytte. */
-async function updateSource(loadDefaultExample = true) {
-  invalidate();
+/** Vis valgt profils endepunkter og sentrale pasientinput uten å erstatte skjemaet. */
+function renderSource() {
   const source = selectedSource();
-  const dhg = isDhg();
-  $('endpoint').textContent = source?.baseUrl || '';
-  $('patient').hidden = dhg;
-  $('test-patient').hidden = !dhg;
-  $('patient-label').textContent = dhg ? 'Syntetisk testperson (NIN)' : 'Patient-ID';
-  $('patient-label').htmlFor = dhg ? 'test-patient' : 'patient';
-  $('patient-help').textContent = dhg
-    ? 'Bare godkjente syntetiske testpersoner. Oppslaget sendes til DHG Test når du trykker Hent data og preutfyll.'
-    : 'Logisk ressurs-ID, for eksempel demo-patient.';
+  const identifier = usesIdentifier(), testList = usesTestList();
+  $('endpoint').textContent = (source?.endpoints || []).map(s => `${s.name}: ${s.baseUrl}`).join(' · ');
+  $('patient').hidden = testList;
+  $('patient').maxLength = identifier ? 256 : 64;
+  $('test-patient').hidden = !testList;
+  $('patient-label').textContent = testList ? 'Syntetisk testperson' : identifier ? 'Pasientidentifikator' : 'Patient-ID';
+  $('patient-label').htmlFor = testList ? 'test-patient' : 'patient';
+  $('patient-help').textContent = testList
+    ? 'Bare godkjente syntetiske testpersoner. Pasienten hentes fra profilens sentrale kilde når du preutfyller.'
+    : identifier ? 'Identifikator for oppslag i profilens sentrale pasientkilde.' : 'Logisk ressurs-ID i den sentrale pasientkilden, for eksempel demo-patient.';
   $('test-patient').replaceChildren();
   for (const [index, identifier] of (source?.testPatientIdentifiers || []).entries()) {
     const option = element('option', '', `Testperson ${index + 1} · ${identifier}`);
     option.value = identifier;
     $('test-patient').append(option);
   }
+}
+/** Velg profilen fra eksakt Questionnaire-URL og versjon. Serveren håndhever samme kobling. */
+function syncQuestionnaireProfile(questionnaire) {
+  if (!config) return;
+  const candidates = (config.questionnaireBindings || []).filter(b => b.questionnaire === questionnaire?.url);
+  const binding = candidates.find(b => b.version === questionnaire?.version);
+  profileLocked = !!binding || candidates.length > 0 || !!config.requireQuestionnaireBinding;
+  profileError = !binding && profileLocked ? 'Denne Questionnaire-URL-en og versjonen er ikke registrert for preutfylling.' : '';
+  if (binding && $('source').value !== binding.profileId) {
+    $('source').value = binding.profileId;
+    renderSource();
+  }
+  $('profile-help').textContent = binding
+    ? `Profilen er konfigurert for dette skjemaet, versjon ${binding.version}.`
+    : profileError || 'Uregistrert testskjema: velg populeringsprofil manuelt.';
+  $('source').disabled = busy || initializing || profileLocked;
+  $('populate').disabled = busy || initializing || !!profileError;
+}
+/** Et eget redigert skjema beholdes ved manuelt profilbytte. */
+async function updateSource(loadDefaultExample = true) {
+  invalidate();
+  renderSource();
+  const source = selectedSource();
   if (loadDefaultExample && $('example').value !== 'custom') {
     $('example').value = source?.defaultExample || 'pregnancy';
     await loadExample($('example').value);
   }
+  updateInfo();
 }
 // Spørsmålsantall og versjon er en forhåndsvisning; serverens QuestionnaireGuard avgjør hva som støttes.
 function updateInfo() {
@@ -69,7 +97,11 @@ function updateInfo() {
     const q = JSON.parse($('questionnaire').value);
     const questions = flatten(q.item).filter(i => !['group', 'display'].includes(i.type));
     $('q-info').textContent = `${questions.length} spørsmål · versjon ${q.version || 'mangler'}`;
-  } catch { $('q-info').textContent = 'JSON må være gyldig før preutfylling'; }
+    syncQuestionnaireProfile(q);
+  } catch {
+    $('q-info').textContent = 'JSON må være gyldig før preutfylling';
+    syncQuestionnaireProfile(null);
+  }
 }
 // Leser et lokalt Q-eksempel fra appen. Dette starter ingen oppslag hos en ekstern FHIR-kilde.
 async function loadExample(name) {
@@ -161,9 +193,11 @@ async function populate() {
   try {
     questionnaire = JSON.parse($('questionnaire').value);
     if (questionnaire.resourceType !== 'Questionnaire') throw new Error('Input må være et FHIR Questionnaire.');
-    if (isDhg()) {
-      if (!/^[0-9]{11}$/.test(patientKey()) || !selectedSource().testPatientIdentifiers.includes(patientKey()))
-        throw new Error('Velg en godkjent syntetisk testperson for DHG.');
+    syncQuestionnaireProfile(questionnaire);
+    if (profileError) throw new Error(profileError);
+    if (usesIdentifier()) {
+      if (!patientKey() || (usesTestList() && !selectedSource().testPatientIdentifiers.includes(patientKey())))
+        throw new Error('Velg en gyldig pasientidentifikator for den sentrale kilden.');
     } else if (!/^[A-Za-z0-9.-]{1,64}$/.test(patientKey())) throw new Error('Skriv inn en gyldig logisk Patient-ID.');
   } catch (error) {
     message(error instanceof SyntaxError ? 'Ugyldig JSON. Kontroller komma, anførselstegn og parenteser i Questionnaire.' : error.message, true);
@@ -176,7 +210,8 @@ async function populate() {
     // Nettleserfristen er litt lengre enn serverens 60 sekunder, så serverens feilsvar kan rekke frem.
     const response = await fetch('/api/populate', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ questionnaire, sourceId: $('source').value, [isDhg() ? 'patientIdentifier' : 'patientId']: patientKey() }),
+      body: JSON.stringify({ questionnaire, profileId: $('source').value, configurationRevision: config.revision,
+        [usesIdentifier() ? 'patientIdentifier' : 'patientId']: patientKey() }),
       signal: AbortSignal.timeout(65000)
     });
     const data = await response.json();
@@ -250,14 +285,14 @@ $('copy').addEventListener('click', async () => {
 document.addEventListener('keydown', event => {
   if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') { event.preventDefault(); populate(); }
 });
-// Oppstart henter kildevalg og et eksempelskjema fra egen server. Ingen DHG-oppslag kjøres her.
+// Oppstart henter profiler og eksempelskjema fra egen server. Ingen eksterne kildeoppslag kjøres her.
 (async () => {
   setBusy(false);
   try {
     const response = await fetch('/api/config');
     if (!response.ok) throw new Error('Kunne ikke hente serverkonfigurasjon.');
     config = await response.json();
-    for (const source of config.sources) {
+    for (const source of config.profiles) {
       const option = element('option', '', source.name); option.value = source.id; $('source').append(option);
     }
     $('patient').value = config.defaultPatientId;

@@ -55,6 +55,8 @@ public static class DemoFiles
     {
         "general" => Read<Questionnaire>("questionnaire-general.json"),
         "pregnancy" => Read<Questionnaire>("questionnaire-pregnancy.json"),
+        "routed-v1" => Read<Questionnaire>("questionnaire-routed-v1.json"),
+        "routed-v2" => Read<Questionnaire>("questionnaire-routed-v2.json"),
         "dhg" => Read<Questionnaire>("questionnaire-dhg.json"),
         _ => throw new PopulationException("scenario", "Ukjent demoscenario.")
     };

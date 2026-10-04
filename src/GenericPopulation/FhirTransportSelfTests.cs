@@ -54,11 +54,7 @@ internal static class FhirTransportSelfTests
     }
 
     private static Task<Patient> Read(bool dhg, HttpClient client, CancellationToken ct) => dhg
-        ? new DhgFhirDataSource(client, new FhirSourceOptions
-        {
-            Id = "dhg-test", Mode = "dhg-post", BaseUrl = "https://dhg.example/fhir/",
-            AllowedTestPatientIdentifiers = ["00000000001"]
-        }).ReadPatientAsync("00000000001", ct)
+        ? new HttpFhirDataSource(client, DhgSelfTests.Options()).ReadPatientAsync("00000000001", ct)
         : new HttpFhirDataSource(client, new Uri("http://127.0.0.1/fhir/"), new LocalDemoAuthorizer())
             .ReadPatientAsync("synthetic-patient", ct);
 

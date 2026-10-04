@@ -88,6 +88,8 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   align-items:center;
   font-size:12px
 }
+.topbar-actions { display:flex; align-items:center; gap:24px }
+@media(max-width:560px) { .topbar-actions { gap:10px } .topbar-actions .badge { display:none } }
 .dot,.footer-dot {
   display:inline-block;
   width:7px;

@@ -1,5 +1,55 @@
 # Verifisert leveranse
 
+## Konfigurasjon i GUI
+
+Kontrollert 4. oktober 2026 med syntetiske data og lokale endepunkter. Konfigurasjonssiden viser og redigerer kilder, profiler og Questionnaire-versjoner. Hele utkastet valideres før atomisk lagring i `.local/fhir-configuration.json`; nye kall bruker det lagrede oppsettet, mens pågående kall beholder sin konfigurasjon.
+
+| Kontroll | Resultat |
+| --- | --- |
+| Release-bygg og publisering med `--warnaserror` | Bestått, ingen advarsler |
+| C#-regresjoner | 76 av 76 bestått, inkludert ugyldig konfigurasjon, isolerte utkast, lagring/omstart, samtidige lagringer, manuell filendring, skrivefeil og avbrudd |
+| Opprinnelige HTTP-regresjoner | 24 av 24 bestått |
+| DHG, ruting og konfigurasjons-API | 56 av 56 bestått; validering uten aktivering, lagring, referanser, Origin/JSON-grense og revisjonskonflikter inngår |
+| Konfigurasjon i Edge | 9 av 9 scenarioer bestått: lasting, ugyldig JSON, oppretting av alle tre nivåer, faktisk populering fra lagret oppsett, konflikt mellom faner, sletting av referert kilde, duplisering/eksport, mobilvisning og feil ved lasting |
+| Eksisterende nettleserflyt og asynkron UI-tilstand | Desktop/mobil bestått uten JavaScript-feil; 8 av 8 asynkrone regresjoner bestått |
+| Visuell kontroll | Konfigurasjonssiden kontrollert ved 1440 px og 390 px; ingen vannrett overflyt |
+| `git diff --check` | Bestått |
+
+HTTP- og nettlesertestene bruker en midlertidig kopi av den publiserte appen, slik at konfigurasjonslagring ikke endrer utviklerens innstillinger. Ingen eksterne tjenester ble kontaktet. Oppsett og lagringsprioritet er dokumentert i [konfigurasjonsveiledningen](../docs/FHIR_CONFIGURATION.md#rediger-konfigurasjonen-i-appen).
+
+## Endepunkter per Questionnaire og versjon
+
+Kontrollert 4. oktober 2026 med lokale, syntetiske kilder. `Fhir:QuestionnaireBindings` kobler eksakt URL/versjon til en populeringsprofil før Patient-oppslag. Nettleseren følger koblingen ved eksempellasting, opplasting og innliming; et registrert skjema kan ikke overstyres med en annen profil.
+
+| Kontroll | Resultat |
+| --- | --- |
+| Release-bygg med `--warnaserror` og publisering | Bestått |
+| C#-regresjoner | 69 av 69 bestått, inkludert versjonsvalg, overstyring, utviklerfallback, påkrevd registrering og konfigurasjonsfeil |
+| Opprinnelige HTTP-regresjoner | 24 av 24 bestått |
+| DHG/fler-kilde/skjemaversjon gjennom HTTP | 40 av 40 bestått; ukjent versjon og motstridende profil stoppes før sentral Patient hentes |
+| Påkrevd skjemaregistrering gjennom publisert HTTP-app | Uregistrert skjema gir 422; registrert versjon gir 200 med riktig profil |
+| Edge desktop/mobil | Bestått; versjonsbytte velger riktig profil, profilvalg låses, ukjent versjon stoppes og opplastet Q styrer profilen |
+| Asynkrone UI-regresjoner | 8 av 8 bestått, inkludert registrert Q limt inn mens konfigurasjonen lastes |
+| `git diff --check` | Bestått |
+
+Eksemplene `questionnaire-routed-v1.json` og `questionnaire-routed-v2.json` har samme canonical og ulike profiler. `populate-request-questionnaire.json` fungerer uten `profileId`. Ingen eksterne tjenester ble kontaktet i testene.
+
+## Generisk FHIR-transport og flere endepunkter
+
+Kontrollert 4. oktober 2026 med syntetiske data og lokale tjenester. Motoren bruker nå en konfigurerbar ruter; alle endepunkter bruker samme GET/POST-klient. Patient hentes én gang fra profilens sentrale kilde. DHG-adapteren er fjernet og begrensningene ligger i appsettings.
+
+| Kontroll | Resultat |
+| --- | --- |
+| Release-bygg med `--warnaserror`, publisering og `git diff --check` | Bestått |
+| C#-regresjoner | 65 av 65 bestått, inkludert prioritet, tvetydige ruter, versjon/scope, cache mellom kilder, generisk POST/paginering, sentral Patient og valgfrie kilder |
+| Opprinnelige HTTP-regresjoner | 24 av 24 bestått |
+| DHG og fler-endepunkt mot lokale kilder | 30 av 30 bestått; sentral Patient og to kliniske søk ga tre HTTP-kall fordelt 2 + 1 på de valgte endepunktene |
+| Edge desktop/mobil og brukerflyt | Bestått uten JavaScript-feil; omfatter profilbytte, kilder i samme QR, filopplasting, DHG-testliste og nedlasting |
+| Asynkrone UI-regresjoner | 7 av 7 bestått |
+| Lisensinventar og publiserte dokumenter | Alle 11 NuGet-pakker kontrollert |
+
+Ingen eksterne DHG-tjenester ble kontaktet i denne verifikasjonen. [Konfigurasjonsveiledningen](../docs/FHIR_CONFIGURATION.md) beskriver ruteregler, API-begrensninger, migrering og den kjørbare lokale fler-kildedemoen. Kildestatistikken er ikke full klinisk Provenance per svarfelt. Sammenslåing av samme søk fra flere kilder er ikke implementert.
+
 ## Rettelser etter fullstack-gjennomgang: P2
 
 Kontrollert 4. oktober 2026 med syntetiske data og lokale tjenester. De fire P2-funnene er rettet:

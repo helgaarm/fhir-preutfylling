@@ -15,6 +15,11 @@
     <PackageReference Include="Hl7.Fhir.R4" Version="6.6.0" />
   </ItemGroup>
   <ItemGroup>
+    <!-- Lokale GUI-innstillinger skal aldri følge bygg eller publisering. -->
+    <Content Remove=".local/**/*" />
+    <None Remove=".local/**/*" />
+  </ItemGroup>
+  <ItemGroup>
     <Content Include="../../LICENSE" Link="LICENSE"
              CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <!-- Lisensgrunnlag og tredjepartsmerknader skal følge både lokal build og distribuert app. -->

@@ -1,0 +1,43 @@
+.configuration-page { padding-bottom:24px }
+.configuration-page .intro { gap:20px }
+.config-toolbar { padding:20px 24px; margin-bottom:18px }
+.config-toolbar .field-help { font-size:12px; line-height:1.6; margin:14px 0 }
+.config-actions { display:flex; flex-wrap:wrap; gap:10px; align-items:center }
+.config-actions .primary-button { width:auto; padding:10px 20px }
+.config-checkbox { display:flex; align-items:center; gap:10px; font-size:13px; line-height:1.5 }
+.config-checkbox input { width:18px; height:18px; flex:none; accent-color:var(--teal) }
+.config-layout { display:grid; grid-template-columns:310px minmax(0,1fr); gap:24px; align-items:start }
+.config-kinds { display:flex; background:var(--soft); border-bottom:1px solid var(--border) }
+.config-kinds button { flex:1; padding:15px 5px; border:0; border-bottom:3px solid transparent; background:transparent; color:var(--muted); font-size:13px }
+.config-kinds button[aria-pressed=true] { color:var(--teal); border-bottom-color:var(--teal); font-weight:600 }
+.config-list-heading { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:18px 18px 4px }
+.config-list-heading h2,.config-editor h2 { font-size:16px; margin:0 }
+#config-list-help { margin:8px 18px 16px; font-size:12px; line-height:1.6 }
+.config-entry { display:flex; flex-direction:column; align-items:start; gap:7px; width:100%; text-align:left; padding:16px 18px; background:var(--white); color:var(--ink); border:0; border-top:1px solid var(--border); overflow-wrap:anywhere }
+.config-entry:hover { background:var(--soft) }
+.config-entry[aria-current=true] { background:#edf6f1; box-shadow:inset 3px 0 var(--teal) }
+.config-entry strong { font-size:13px; font-weight:600 }
+.config-entry span { font-size:11px; color:var(--muted); line-height:1.5 }
+.config-empty { padding:25px; color:var(--muted); font-size:13px; line-height:1.7 }
+#config-fields { border:0; padding:24px; margin:0; min-width:0; display:grid; grid-template-columns:1fr 1fr; gap:20px }
+.config-field { min-width:0 }
+.config-field label { line-height:1.5 }
+.config-field input[type=checkbox] { width:20px; height:20px; accent-color:var(--teal) }
+.config-field.full-width { grid-column:1 / -1 }
+.config-field textarea { border:1px solid var(--border); border-radius:6px; height:170px; padding:12px; font-size:12px }
+.config-field textarea.line-list { height:85px; white-space:pre-wrap }
+.config-field .field-help { font-size:11px; line-height:1.6 }
+.config-editor { min-width:0 }
+.configuration-page .message { margin:0 0 18px }
+.configuration-page footer { gap:14px; flex-wrap:wrap }
+@media(max-width:900px) { .config-layout { grid-template-columns:1fr } #config-list { max-height:270px; overflow:auto } }
+@media(max-width:560px) {
+  #config-fields { grid-template-columns:1fr; padding:18px }
+  .config-field.full-width { grid-column:auto }
+  .config-toolbar { padding:18px }
+  .config-actions .primary-button { width:100% }
+  .config-editor .panel-heading { align-items:start; flex-direction:column }
+  .configuration-page .intro { align-items:start; flex-direction:column }
+  .configuration-page .subtitle { line-height:1.6 }
+  .configuration-page .config-checkbox { align-items:start }
+}

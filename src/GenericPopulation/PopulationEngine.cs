@@ -44,8 +44,10 @@ public sealed class PopulationEngine(IFhirDataSource source)
         // Like søk gjenbrukes bare innen denne kjøringen. Del aldri denne cachen mellom
         // pasienter, virksomheter eller tilgangskontekster.
         var cache = new Dictionary<string, Bundle>(StringComparer.Ordinal);
-        scope = await BindAsync(q.Extension, qr, scope, context, cache, outcome, cancellationToken);
-        qr.Item = await PopulateItemsAsync(q.Item, scope, context, cache, outcome, cancellationToken);
+        var origin = new QueryOrigin(q.Url!, q.Version!, null, "");
+        scope = await BindAsync(q.Extension, qr, scope, context, cache, outcome, origin, cancellationToken);
+        qr.Item = await PopulateItemsAsync(q.Item, scope, context, cache, outcome, origin, cancellationToken);
+        outcome.Issue.AddRange(source.Issues.Select(i => (OperationOutcome.IssueComponent)i.DeepCopy()));
         if (outcome.Issue.Count == 0)
             outcome.Issue.Add(new OperationOutcome.IssueComponent
             {
@@ -60,7 +62,7 @@ public sealed class PopulationEngine(IFhirDataSource source)
     // En variabel i én gruppe skal ikke påvirke en søskengruppe.
     private async Task<Dictionary<string, Base[]>> BindAsync(IEnumerable<Extension> extensions,
         Base focus, Dictionary<string, Base[]> parent, PopulationContext context,
-        Dictionary<string, Bundle> cache, OperationOutcome outcome, CancellationToken ct)
+        Dictionary<string, Bundle> cache, OperationOutcome outcome, QueryOrigin origin, CancellationToken ct)
     {
         var scope = new Dictionary<string, Base[]>(parent);
         // Rekkefølgen i Q er viktig: et uttrykk kan bruke variabler som allerede er bundet.
@@ -71,8 +73,10 @@ public sealed class PopulationEngine(IFhirDataSource source)
             Base[] values;
             if (expression.Language == "application/x-fhir-query")
             {
-                var query = FhirSearch.FromTemplate(expression.Expression_!, context);
-                if (!cache.TryGetValue(query.RelativeUrl, out var bundle))
+                var query = FhirSearch.FromTemplate(expression.Expression_!, context) with
+                    { Origin = origin with { Variable = expression.Name! } };
+                var cacheKey = source.CacheKey(query, context);
+                if (!cache.TryGetValue(cacheKey, out var bundle))
                 {
                     bundle = await source.SearchAsync(query, context, ct);
                     if (bundle.Type != Bundle.BundleType.Searchset)
@@ -88,7 +92,7 @@ public sealed class PopulationEngine(IFhirDataSource source)
                                 Warn(outcome, null, "Datakilden returnerte en merknad; resultatet må kontrolleres.");
                         }
                     }
-                    cache[query.RelativeUrl] = bundle;
+                    cache[cacheKey] = bundle;
                 }
                 // Søkevariabelen inneholder hele Bundle. FHIRPath i Q velger deretter entry.resource.
                 values = [bundle];
@@ -104,7 +108,7 @@ public sealed class PopulationEngine(IFhirDataSource source)
     private async Task<List<QuestionnaireResponse.ItemComponent>> PopulateItemsAsync(
         IEnumerable<Questionnaire.ItemComponent> questions, Dictionary<string, Base[]> parent,
         PopulationContext context, Dictionary<string, Bundle> cache,
-        OperationOutcome outcome, CancellationToken ct)
+        OperationOutcome outcome, QueryOrigin origin, CancellationToken ct)
     {
         var items = new List<QuestionnaireResponse.ItemComponent>();
         foreach (var question in questions)
@@ -115,10 +119,11 @@ public sealed class PopulationEngine(IFhirDataSource source)
             {
                 LinkId = question.LinkId, Text = question.Text, Definition = question.Definition
             };
-            var scope = await BindAsync(question.Extension, item, parent, context, cache, outcome, ct);
+            var scope = await BindAsync(question.Extension, item, parent, context, cache, outcome,
+                origin with { LinkId = question.LinkId }, ct);
             if (question.Type == QType.Group)
             {
-                item.Item = await PopulateItemsAsync(question.Item, scope, context, cache, outcome, ct);
+                item.Item = await PopulateItemsAsync(question.Item, scope, context, cache, outcome, origin, ct);
             }
             else
             {
