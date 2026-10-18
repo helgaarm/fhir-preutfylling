@@ -230,6 +230,13 @@ python verification/browser-smoke.py
 python verification/browser-state-tests.py
 ```
 
+Kjør alle nettleserregresjoner, inkludert initialisering av første testperson og profilbytte,
+mot en automatisk startet lokal DHG-testdobbel:
+
+```sh
+python verification/dhg-http-smoke.py --app-dir publish --browser
+```
+
 CLI med fixtures direkte, uten HTTP:
 
 ```sh

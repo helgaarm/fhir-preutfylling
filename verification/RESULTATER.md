@@ -1,5 +1,53 @@
 # Verifisert leveranse
 
+## Initialisering av første profils testperson
+
+Kontrollert 18. oktober 2026 mot `main`-grunnlaget `08394d9` (PR #9), med .NET SDK 9.0.319,
+Python Playwright 1.63.0 og lokalt installert Chromium 138.0.7204.0. Alle FHIR-kall gikk
+til lokale syntetiske kilder. Ingen eksterne DHG-endepunkter ble testet.
+
+Feilen ble reprodusert før rettelsen: med DHG som eneste profil forventet den nye
+nettlesertesten `29760484634`, men feltet beholdt HTML-standardverdien `demo-patient`.
+`renderedPatientSource` var ennå ikke satt ved første rendering.
+
+Rettelsen skiller pasientfeltets `input`-hendelser fra annen redigering. Et urørt felt
+initialiseres fra første profils forslag, demostandard eller tom verdi. Tidlig manuell
+input beholdes, også bevisst tømming og redigering tilbake til HTML-standardverdien.
+Eksisterende pasientinput per kilde ved profilbytte og revisjonsvern for asynkrone svar
+er beholdt. HTML, API-kontrakt og servervalidering er uendret.
+
+| Kontroll | Resultat |
+| --- | --- |
+| Låst NuGet-restore, Release-bygg med `--warnaserror` og publisering | Bestått; 0 advarsler / 0 feil |
+| C#-selvtester | 87 av 87 bestått |
+| Opprinnelige HTTP-regresjoner | 24 av 24 bestått |
+| DHG HTTP-regresjoner | 76 av 76 bestått |
+| Nye pasient-/oppstartsregresjoner | 12 av 12 bestått etter rettelsen; DHG-oppstart feilet før rettelsen |
+| Eksisterende asynkrone UI-regresjoner | 11 av 11 bestått |
+| Konfigurasjons-UI | 10 av 10 bestått |
+| Eksisterende nettleserflyt og manuell input | Bestått, inkludert desktop/mobil, opplasting, pasientbytte og fravær av JavaScript-feil |
+| Lisenskontroll og feiltilfeller | 11 pakker og publiserte lisensfiler kontrollert; 10 av 10 regresjoner bestått |
+| JavaScript-syntaks, Python-kompilering og `git diff --check` | Bestått |
+
+De nye testene i `browser-patient-startup-tests.py` bruker eksplisitte hendelser for å
+holde igjen konfigurasjonssvaret, uten tidsbaserte forsinkelser. De verifiserer vanlig demo,
+konfigurert demostandard, DHG først, tidlig manuell input, tomme felt, manglende forslag,
+tidlig skjemaendring og profilbytte mellom delte og ulike pasientkilder. Første faktiske
+preutfylling kontrolleres med riktig `patientId`/`patientIdentifier` og Patient-referanse.
+De eksisterende testene dekker i tillegg begge rekkefølger for fil-/konfigurasjonslasting,
+lesefeil og avvisning av foreldede API-svar og feil.
+
+Kjør hele DHG-/nettleserpakken, inkludert de nye testene, med:
+
+```sh
+dotnet publish src/GenericPopulation -c Release -o publish
+python verification/dhg-http-smoke.py --app-dir publish --browser
+```
+
+Testene inngår automatisk i eksisterende CI via samme kommando. Den lokale kjøringen
+brukte `PLAYWRIGHT_CHANNEL=chromium` med den tilgjengelige Chromium-installasjonen;
+CI installerer nettleseren som følger Playwright. CI-status må leses på rettelsens PR.
+
 ## Konfigurasjon i GUI
 
 Kontrollert 4. oktober 2026 med syntetiske data og lokale endepunkter. Konfigurasjonssiden viser og redigerer kilder, profiler og Questionnaire-versjoner. Hele utkastet valideres før atomisk lagring i `.local/fhir-configuration.json`; nye kall bruker det lagrede oppsettet, mens pågående kall beholder sin konfigurasjon.
