@@ -32,6 +32,10 @@ Start webappen fra en vanlig terminal med nettverkstilgang når eksterne FHIR-ki
 
 Nettleseren laster svangerskapseksemplet som standard. Du kan bytte til personopplysninger, lime inn en egen Q eller laste opp en `.json`-fil. **Egen Q må følge støtteprofilen nedenfor**, inkludert uttrykk som beskriver databehovet; motoren utleder ikke datakoblinger fra spørsmålets tekst.
 
+Velg **Eget skjema** for å arbeide med egen JSON, eller trykk **Last opp JSON** direkte. Opplasting og redigering virker også mens serverkonfigurasjonen lastes eller hvis lastingen feiler; preutfylling krever at konfigurasjonen er tilgjengelig. Et eget skjema beholdes ved profilbytte.
+
+Skriv testpersonens **Patient-ID** eller **fødselsnummer / identifikator** direkte i feltet på forsiden, og trykk **Hent data og preutfyll**. Du trenger ikke registrere personen eller endre konfigurasjonen. Eventuelle konfigurerte testpersoner vises som valgfrie forslag; andre identifikatorer kan skrives inn med samme formatkontroll. Testpersonen må allerede finnes i FHIR-kilden. Manuell input lagres bare i sidens minne, ikke i konfigurasjonen eller nettleserlagring.
+
 Den lokale FHIR-kilden eksponerer:
 
 - `GET /demo/fhir/Patient/demo-patient`
@@ -52,7 +56,7 @@ Velg **Lokal demo · flere endepunkter** for å prøve én sentral pasientkilde 
 
 Endepunkter kan også styres **per Questionnaire-URL og eksakt versjon** gjennom `Fhir:QuestionnaireBindings`. Velg **Skjemastyrte kilder · versjon 1/2** i eksempelvelgeren for å prøve dette. Profilen velges automatisk og kan ikke overstyres for registrerte skjemaversjoner. Sett `Fhir:RequireQuestionnaireBinding` til `true` dersom alle skjemaer skal kreve en slik kobling.
 
-For DHG-fasaden er **DHG · Azure Test** allerede tilgjengelig i kildevalget. Velg kilden og en av de to godkjente syntetiske testpersonene; eksemplet **DHG – svangerskap og kontakter** lastes automatisk. Klikk **Hent data og preutfyll** for å gjøre oppslagene. Se [DHG-veiledningen](docs/DHG.md) for kontrakt, kjørbare eksempler og lokal testing uten eksterne kall.
+For DHG-fasaden er **DHG · Azure Test** allerede tilgjengelig i kildevalget. Velg kilden og skriv en syntetisk testpersons fødselsnummer, eller bruk et av de to forslagene; eksemplet **DHG – svangerskap og kontakter** lastes automatisk. Klikk **Hent data og preutfyll** for å gjøre oppslagene. Se [DHG-veiledningen](docs/DHG.md) for kontrakt, kjørbare eksempler og lokal testing uten eksterne kall.
 
 Andre FHIR-testservere med vanlig GET-kontrakt konfigureres slik:
 

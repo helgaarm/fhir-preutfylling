@@ -80,7 +80,7 @@ internal static class FhirSourceSelfTests
             Check(form["subject.identifier"] == "00000000001" && form["code"] == code && form["date"] == "ge2026-09-01", "form roundtrip");
             Check(!form.ContainsKey("patient"), "logical ID not sent as search identity");
         }),
-        ("FHIR-kilde: konfigurert mønster og tillatte identifikatorer håndheves før nettverkskall", async () =>
+        ("FHIR-kilde: identifikatorformat kontrolleres før nettverkskall", async () =>
         {
             using var handler = new Handler();
             using var http = new HttpClient(handler);
@@ -88,9 +88,23 @@ internal static class FhirSourceSelfTests
             options.PatientIdentifierPattern = @"\ATEST-[0-9]{3}\z";
             options.AllowedTestPatientIdentifiers = [TestIdentifier];
             var source = new HttpFhirDataSource(http, options);
-            foreach (var id in new[] { "", "not-an-identifier", "TEST-002", "TEST-001\n", "TEST-００１", "urn:test|TEST-001" })
+            foreach (var id in new[] { "", "not-an-identifier", "TEST-001\n", "TEST-００１", "urn:test|TEST-001" })
                 await Error("patient-context", () => source.ReadPatientAsync(id, default));
             Check(handler.Requests.Count == 0, "no requests");
+        }),
+        ("FHIR-kilde: manuell testidentifikator krever ingen registrering", async () =>
+        {
+            using var handler = new Handler(Reply(BundleOf(Patient())), Reply(BundleOf()));
+            using var http = new HttpClient(handler);
+            var options = Options();
+            options.PatientIdentifierPattern = @"\ATEST-[0-9]{3}\z";
+            options.AllowedTestPatientIdentifiers = [TestIdentifier];
+            var source = new HttpFhirDataSource(http, options);
+            var patient = await source.ReadPatientAsync("TEST-002", default);
+            await source.SearchAsync(Search(patient), new(patient, true), default);
+            Check(QueryHelpers.ParseQuery(handler.Requests[0].Body)["identifier"] == "TEST-002" &&
+                QueryHelpers.ParseQuery(handler.Requests[1].Body)["subject.identifier"] == "TEST-002", "manual identity binds patient and clinical searches");
+            Check(options.AllowedTestPatientIdentifiers.SequenceEqual(new[] { TestIdentifier }), "suggestions stay unchanged");
         }),
         ("FHIR-kilde: manglende eller tvetydig Patient gir ikke QR", async () =>
         {

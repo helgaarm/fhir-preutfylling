@@ -64,12 +64,73 @@ async def config_failure(page):
     page.on('request', lambda request: calls.append(request.url) if request.url.endswith('/api/populate') else None)
     await page.goto(BASE)
     await expect(page.locator('#message')).to_contain_text('Kunne ikke starte appen')
-    for control in CONTROLS:
+    for control in ('source', 'example', 'populate'):
         await expect(page.locator('#' + control)).to_be_disabled()
     await expect(page.locator('#questionnaire')).to_be_enabled()
-    await page.locator('#questionnaire').fill(GENERAL)
+    await expect(page.locator('#upload')).to_be_enabled()
+    await page.locator('#file').set_input_files(ROOT / 'examples/questionnaire-general.json')
+    await expect(page.locator('#example')).to_have_value('custom')
+    assert json.loads(await page.locator('#questionnaire').input_value()) == json.loads(GENERAL)
     await page.locator('#questionnaire').press('Control+Enter')
     assert not calls
+
+
+async def early_upload(page, file_finishes_first):
+    release, received = asyncio.Event(), asyncio.Event()
+
+    async def delayed_config(route):
+        response = await route.fetch()
+        await release.wait()
+        await route.fulfill(response=response)
+        received.set()
+
+    await page.add_init_script("""(() => {
+        const read = File.prototype.text;
+        File.prototype.text = function () {
+            return new Promise((resolve, reject) => {
+                window.finishFileRead = () => read.call(this).then(resolve, reject);
+            });
+        };
+    })();""")
+    await page.route('**/api/config', delayed_config)
+    await page.goto(BASE, wait_until='domcontentloaded')
+    await page.locator('#patient').fill('typed-before-config')
+    await expect(page.locator('#upload')).to_be_enabled()
+    await page.locator('#file').set_input_files(ROOT / 'examples/questionnaire-general.json')
+    if file_finishes_first:
+        await page.evaluate('window.finishFileRead()')
+        await expect(page.locator('#example')).to_have_value('custom')
+        await expect(page.locator('#populate')).to_be_disabled()
+        release.set()
+    else:
+        release.set()
+        await asyncio.wait_for(received.wait(), timeout=10)
+        # Wait until config is applied, while the file still owns the busy state.
+        await expect(page.locator('#source option')).not_to_have_count(0)
+        await expect(page.locator('#populate')).to_be_disabled()
+        await expect(page.locator('#upload')).to_be_disabled()
+        await expect(page.locator('#run-label')).to_have_text('Leser skjema …')
+        await page.evaluate('window.finishFileRead()')
+    await expect(page.locator('#populate')).to_be_enabled()
+    await expect(page.locator('#patient')).to_have_value('typed-before-config')
+    await expect(page.locator('#example')).to_have_value('custom')
+    await page.locator('#patient').fill('demo-patient')
+    await page.locator('#populate').click()
+    await result_matches_editor(page)
+
+
+async def custom_option(page):
+    await page.goto(BASE)
+    await expect(page.locator('#populate')).to_be_enabled()
+    original = await page.locator('#questionnaire').input_value()
+    await page.locator('#example').select_option('custom')
+    await expect(page.locator('#questionnaire')).to_be_focused()
+    assert await page.locator('#questionnaire').input_value() == original
+    await page.locator('#questionnaire').fill(GENERAL)
+    await page.locator('#source').select_option('demo-multi')
+    assert json.loads(await page.locator('#questionnaire').input_value()) == json.loads(GENERAL)
+    await page.locator('#populate').click()
+    await result_matches_editor(page)
 
 
 async def pending_file(page, outcome):
@@ -150,7 +211,10 @@ async def stale_response(page, status):
 async def main():
     cases = [('Early input survives startup and enables controls', early_input),
              ('Registered Q pasted during startup selects its bound profile', lambda page: early_input(page, registered=True)),
-             ('Failed configuration keeps remote actions disabled', config_failure)]
+             ('Failed configuration permits local upload and blocks population', config_failure),
+             ('Upload completed before configuration is preserved', lambda page: early_upload(page, True)),
+             ('Configuration arriving during upload does not unlock or replace it', lambda page: early_upload(page, False)),
+             ('Own questionnaire can be selected and survives a profile change', custom_option)]
     for outcome in ('success', 'invalid-json', 'read-error'):
         cases.append(('File read locks controls and recovers: ' + outcome,
                       lambda page, outcome=outcome: pending_file(page, outcome)))

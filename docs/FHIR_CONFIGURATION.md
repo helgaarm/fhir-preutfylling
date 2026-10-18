@@ -149,7 +149,7 @@ Felles klientgrenser gjelder uavhengig av API-profil: relative søk med nøyakti
 
 ## DHG som konfigurasjon
 
-DHG-eksemplet bruker samme klient med `SearchMethod: POST`, `PatientLookup.Interaction: search`, `PatientBinding.Parameter: patient.identifier` og `ValueFrom: inputIdentifier`. Kildens øvrige begrensninger, testliste og inputmønster ligger i appsettings. Se [DHG-veiledningen](DHG.md).
+DHG-eksemplet bruker samme klient med `SearchMethod: POST`, `PatientLookup.Interaction: search`, `PatientBinding.Parameter: patient.identifier` og `ValueFrom: inputIdentifier`. Kildens øvrige begrensninger, valgfrie testpersonforslag og inputmønster ligger i appsettings. Testpersoner kan også skrives inn direkte på forsiden uten konfigurasjonsendring. Se [DHG-veiledningen](DHG.md).
 
 Ved en annen sentral pasientkilde kan DHG bruke `ValueFrom: patientIdentifier` og et avtalt `IdentifierSystem` fra den sentrale Patient. Konfigurasjonen og kildenes avtale om Patient-ID må stemme; klienten gjør ingen identitetsmatching.
 

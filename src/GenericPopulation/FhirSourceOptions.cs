@@ -18,7 +18,8 @@ public sealed class FhirSourceOptions
     public string DefaultExample { get; set; } = "pregnancy";
     /// <summary>Slå av for endepunkter som bare skal brukes gjennom en fler-kildeprofil.</summary>
     public bool ExposeAsProfile { get; set; } = true;
-    /// <summary>Valgfri offentlig liste med syntetiske testpersoner. Tom liste gir fri identifikatorinput.</summary>
+    /// <summary>Valgfrie forslag til syntetiske testpersoner. Historisk feltnavn beholdes for lagrede oppsett;
+    /// listen begrenser ikke manuell input. Formatet kontrolleres av PatientIdentifierPattern.</summary>
     public List<string> AllowedTestPatientIdentifiers { get; set; } = [];
     public string? PatientIdentifierPattern { get; set; }
 
@@ -67,8 +68,8 @@ public sealed class FhirSourceOptions
                 valid &= Regex.IsMatch(key, pattern, RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(100));
         }
         catch (RegexMatchTimeoutException) { valid = false; }
-        if (!valid || (AllowedTestPatientIdentifiers.Count > 0 && !AllowedTestPatientIdentifiers.Contains(key, StringComparer.Ordinal)))
-            throw new PopulationException("patient-context", "Velg en gyldig pasientidentifikator som er tillatt for den sentrale kilden.");
+        if (!valid)
+            throw new PopulationException("patient-context", "Skriv inn en pasientidentifikator med gyldig format for den sentrale kilden.");
     }
 }
 
