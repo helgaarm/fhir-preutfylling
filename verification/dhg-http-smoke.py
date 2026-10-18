@@ -24,6 +24,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 ROOT = Path(__file__).resolve().parents[1]
 # Dokumenterte syntetiske DHG-testpersoner; ressursene lastes fra repoets lokale eksempelfiler.
 IDENTIFIERS = ['29760484634', '11859699482']
+MANUAL_IDENTIFIER = '00000000001'  # Kun den lokale testdobbelens tredje person.
 PATIENT = json.loads((ROOT / 'examples/dhg-patient.json').read_text(encoding='utf-8'))
 RESOURCES = json.loads((ROOT / 'examples/dhg-resources.json').read_text(encoding='utf-8'))['entry']
 QUESTIONNAIRE = json.loads((ROOT / 'examples/questionnaire-dhg.json').read_text(encoding='utf-8'))
@@ -89,7 +90,7 @@ class DhgMock(BaseHTTPRequestHandler):
         key = 'identifier' if resource_type == 'Patient' else 'patient.identifier'
         assert set(form) == {key} and len(form[key]) == 1
         identifier = form[key][0]
-        assert identifier in IDENTIFIERS
+        assert identifier in [*IDENTIFIERS, MANUAL_IDENTIFIER]
         if self.mode == 'redirect':
             self.send_response(302)
             self.send_header('Location', '/must-not-follow')
@@ -103,6 +104,9 @@ class DhgMock(BaseHTTPRequestHandler):
         if identifier == IDENTIFIERS[1]:
             patient['id'] = 'dhg-synthetic-b'
             patient['name'] = [{'text': 'Annen syntetisk testperson'}]
+        elif identifier == MANUAL_IDENTIFIER:
+            patient['id'] = 'dhg-synthetic-c'
+            patient['name'] = [{'text': 'Manuelt registrert testperson'}]
         if resource_type == 'Patient':
             self.send_json(bundle([patient]))
             return
@@ -192,7 +196,7 @@ def main():
             _, config, _ = call('/api/config')
             source = next(s for s in config['sources'] if s['id'] == 'dhg-test')
             check(source['patientInput'] == 'identifier' and source['testPatientIdentifiers'] == IDENTIFIERS,
-                  'DHG source exposes only configured synthetic patient choices')
+                  'DHG source exposes configured synthetic patient suggestions')
             check(not DhgMock.calls, 'No DHG requests on startup or config read')
             probe = {'configurationRevision': config['revision']}
             for mode, expected_state, expected_http in [('normal', 'ok', 200), ('status-auth', 'warning', 401),
@@ -240,8 +244,18 @@ def main():
             qr_b = next(p['resource'] for p in data['parameter'] if p['name'] == 'response')
             items_b = {i['linkId']: i for i in flat(qr_b['item'])}
             check(status == 200 and qr_b['subject']['reference'] == 'Patient/dhg-synthetic-b' and 'answer' not in items_b['systolic'], 'Patient change cannot reuse previous observations')
+            before_config = call('/api/configuration')[1]
+            before_file = (app_dir / '.local/fhir-configuration.json').exists()
+            for endpoint in ('/api/populate', '/api/questionnaire-response'):
+                status, data, _ = call(endpoint, {**body, 'patientIdentifier': MANUAL_IDENTIFIER})
+                manual_qr = next(p['resource'] for p in data['parameter'] if p['name'] == 'response') if endpoint == '/api/populate' else data
+                check(status == 200 and manual_qr['subject']['reference'] == 'Patient/dhg-synthetic-c',
+                      'Unlisted manual test identifier works directly: ' + endpoint)
+                check(MANUAL_IDENTIFIER not in json.dumps(manual_qr), 'Manual identifier is not copied into QR: ' + endpoint)
+            check(call('/api/configuration')[1] == before_config and (app_dir / '.local/fhir-configuration.json').exists() == before_file,
+                  'Manual population does not register identifiers or write configuration')
             for label, changed, expected in [
-                ('Unapproved NIN', {**body, 'patientIdentifier': '12345678901'}, 422),
+                ('Invalid NIN format', {**body, 'patientIdentifier': '12345'}, 422),
                 ('NIN stays a string', {**body, 'patientIdentifier': 29760484634}, 400),
                 ('No logical ID in DHG input', {'sourceId': 'dhg-test', 'patientId': 'dhg-synthetic-a', 'questionnaire': QUESTIONNAIRE}, 400),
                 ('No mixed identity fields', {**body, 'patientId': 'demo-patient'}, 400),
@@ -342,7 +356,7 @@ def main():
             if args.browser:
                 DhgMock.mode = 'normal'
                 browser_env = dict(env, FHIR_TEST_BASE_URL=base, FHIR_TEST_DHG_MOCK='true')
-                for script in ('browser-smoke.py', 'browser-state-tests.py', 'browser-configuration-tests.py'):
+                for script in ('browser-smoke.py', 'browser-state-tests.py', 'browser-manual-input-tests.py', 'browser-configuration-tests.py'):
                     subprocess.run([sys.executable, '-X', 'utf8', str(ROOT / 'verification' / script)],
                                    cwd=ROOT, env=browser_env, check=True, timeout=120)
         finally:
@@ -356,7 +370,7 @@ def main():
             thread.join(timeout=5)
         app_log.seek(0)
         logs = app_log.read().decode('utf-8', errors='replace')
-        check(all(value not in logs for value in IDENTIFIERS + ['Syntetisk DHG-eksempel', 'must-not-leak']), 'No identifiers or clinical payloads in app logs')
+        check(all(value not in logs for value in IDENTIFIERS + [MANUAL_IDENTIFIER, 'Syntetisk DHG-eksempel', 'must-not-leak']), 'No identifiers or clinical payloads in app logs')
     print(f'{count}/{count} DHG HTTP checks passed. No external services contacted.')
 
 

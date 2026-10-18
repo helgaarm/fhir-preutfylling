@@ -110,8 +110,9 @@ with sync_playwright() as p:
         # An uploaded/custom questionnaire must survive a source switch.
         expect(page.locator('#example')).to_have_value('custom')
         page.locator('#example').select_option('dhg')
-        expect(page.locator('#patient')).to_be_hidden()
-        expect(page.locator('#test-patient')).to_be_visible()
+        expect(page.locator('#patient')).to_be_visible()
+        expect(page.locator('#patient')).to_have_value('29760484634')
+        expect(page.locator('#test-patient option')).to_have_count(2)
         expect(page.locator('#output-result')).to_be_hidden()
         expect(page.locator('#populate')).to_be_enabled()
         page.locator('#populate').click()
@@ -120,7 +121,7 @@ with sync_playwright() as p:
         expect(page.locator('#preview')).to_contain_text('Syntetisk DHG-eksempel')
         expect(page.locator('#preview')).to_contain_text('Nei (false)')
         page.screenshot(path=str(SCREENSHOTS / 'dhg-desktop.png'), full_page=True)
-        page.locator('#test-patient').select_option('11859699482')
+        page.locator('#patient').fill('11859699482')
         expect(page.locator('#output-result')).to_be_hidden()
         page.locator('#populate').click()
         expect(page.locator('#output-result')).to_be_visible()
@@ -131,10 +132,9 @@ with sync_playwright() as p:
         assert page.evaluate('document.documentElement.scrollWidth <= window.innerWidth'), 'DHG mobile overflow'
         page.locator('#source').select_option('demo')
         expect(page.locator('#patient')).to_be_visible()
-        expect(page.locator('#test-patient')).to_be_hidden()
         expect(page.locator('#example')).to_have_value('pregnancy')
         expect(page.locator('#output-result')).to_be_hidden()
-        print('PASS: DHG source, synthetic patient selector, example, POST population, patient change and mobile layout.')
+        print('PASS: DHG source, direct patient input, example, POST population, patient change and mobile layout.')
     assert not errors, errors
     browser.close()
 print('PASS: UI examples, HTTP population, false, repeated answers, file upload, invalid JSON, missing patient, tabs, keyboard, QR download and mobile layout. No JavaScript errors.')

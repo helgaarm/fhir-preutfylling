@@ -16,7 +16,7 @@ dotnet run --project src/GenericPopulation
 
 1. Åpne `http://127.0.0.1:5077`.
 2. Velg **DHG · Azure Test (syntetiske testpersoner)** som populeringsprofil.
-3. Velg **Testperson 1** eller **Testperson 2**, henholdsvis person A og B fra veiledningen.
+3. Skriv testpersonens fødselsnummer direkte i feltet **Testpersonens fødselsnummer / identifikator**, eller bruk et av de to forslagene fra veiledningen. Personen må allerede finnes i testkilden. Ingen registrering i konfigurasjonen er nødvendig.
 4. Appen velger eksemplet **DHG – svangerskap og kontakter**. Et eget innlimt skjema beholdes ved kildebytte; velg DHG-eksemplet selv hvis du vil erstatte det.
 5. Trykk **Hent data og preutfyll**. Kontroller forhåndsvisning, ubesvarte felt og merknader før eventuell nedlasting.
 
@@ -27,7 +27,7 @@ Ingen eksterne oppslag gjøres ved oppstart, valg av kilde eller lasting av ekse
 | Testperson 1 / A | `29760484634` |
 | Testperson 2 / B | `11859699482` |
 
-Bare disse verdiene er godkjent i standardkonfigurasjonen. Serveren håndhever samme liste som grensesnittet. Listen er en avgrensning til avtalte testpersoner, ikke en autorisasjonsløsning for klinisk bruk.
+Disse verdiene er forslag i standardkonfigurasjonen. Andre syntetiske testidentifikatorer kan skrives inn direkte, uten at konfigurasjonen endres. Serveren kontrollerer fortsatt formatet (elleve sifre for DHG), og alle ressurser kontrolleres mot pasienten som hentes. Input beholdes bare i sidens minne. Oppslaget starter ved **Hent data og preutfyll**.
 
 ## Hva eksemplet gjør
 
@@ -53,7 +53,7 @@ $result = Invoke-RestMethod -Method Post `
 $qr = ($result.parameter | Where-Object name -eq 'response').resource
 ```
 
-`$qr` inneholder den nye QuestionnaireResponse. Bruk `/api/questionnaire-response` med samme input for bare QR uten merknader. Feltet er `patientIdentifier` for DHG og `patientId` for vanlige FHIR-kilder. Begge felt samtidig, numerisk NIN, dupliserte inputfelt og ikke godkjente identifikatorer avvises. NIN beholdes som tekst, inkludert eventuelle ledende nuller.
+`$qr` inneholder den nye QuestionnaireResponse. Bruk `/api/questionnaire-response` med samme input for bare QR uten merknader. Feltet er `patientIdentifier` for DHG og `patientId` for vanlige FHIR-kilder. Begge felt samtidig, numerisk NIN, dupliserte inputfelt og identifikatorer med ugyldig format avvises. NIN beholdes som tekst, inkludert eventuelle ledende nuller.
 
 ## HTTP-kontrakt
 
@@ -89,7 +89,7 @@ Kilden er allerede lagt til i `src/GenericPopulation/appsettings.json`. Transpor
 }
 ```
 
-Basen skal inkludere `/fhir/` og ende med skråstrek. Bare serverkonfigurasjonen velger endepunkt. Flere testpersoner må avtales med API-tilbyderen før de legges til. Nettleseren får se listen, så den skal bare inneholde godkjente syntetiske identifikatorer.
+Basen skal inkludere `/fhir/` og ende med skråstrek. Bare serverkonfigurasjonen velger endepunkt. Bruk syntetiske testpersoner som er tilgjengelige hos API-tilbyderen. `AllowedTestPatientIdentifiers` er et historisk feltnavn som beholdes for eksisterende oppsett; listen brukes nå bare til valgfrie forslag og begrenser ikke manuell input. Nettleseren får se forslagene, så listen skal bare inneholde syntetiske identifikatorer.
 
 Standardoppsettet gjelder den **anonyme Azure-testinstansen** og konfigurerer ingen Authorization-, DPoP- eller X-Patient-Context-header. Den generiske klienten støtter bearer-autorisasjon også ved POST, men en bearer-header alene implementerer ikke STS/HelseID/DPoP. Tilgangsavtalen for et autentisert miljø må implementeres gjennom `IRequestAuthorizer`. `Mode: dhg-post` og den tidligere DHG-adapteren er fjernet; bruk eksplisitte transportfelt.
 

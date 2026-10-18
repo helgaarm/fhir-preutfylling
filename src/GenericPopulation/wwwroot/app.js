@@ -7,13 +7,14 @@ const $ = id => document.getElementById(id);
 let config, envelope, qr, busy = false, initializing = true, inputRevision = 0;
 let profileLocked = false, profileError = '';
 let endpointChecks = [];
+let renderedPatientSource;
+const patientInputs = new Map();
 const flatten = items => (items || []).flatMap(item => [item, ...flatten(item.item)]);
 const pretty = value => JSON.stringify(value, null, 2);
 const selectedSource = () => config?.profiles.find(s => s.id === $('source').value);
 // Den sentrale pasientkildens konfigurasjon avgjør input; rutingen skjer på serveren.
 const usesIdentifier = () => selectedSource()?.patientInput === 'identifier';
-const usesTestList = () => usesIdentifier() && !!selectedSource()?.testPatientIdentifiers?.length;
-const patientKey = () => usesTestList() ? $('test-patient').value : $('patient').value.trim();
+const patientKey = () => $('patient').value.trim();
 function message(text, error = false) {
   $('message').textContent = text;
   $('message').classList.toggle('error', error);
@@ -30,14 +31,15 @@ function invalidate() {
 /** Lås input under asynkrone kall og velg mellom tom, ventende og ferdig resultatvisning. */
 function setBusy(value, activity = 'populate') {
   busy = value;
-  for (const id of ['populate', 'source', 'patient', 'test-patient', 'example', 'upload', 'file'])
+  for (const id of ['populate', 'source', 'example'])
     $(id).disabled = value || initializing || !config;
   $('source').disabled ||= profileLocked;
   $('populate').disabled ||= !!profileError;
-  // Eget skjema kan redigeres mens konfigurasjonen lastes, også hvis oppstarten feiler.
-  for (const id of ['format', 'questionnaire']) $(id).disabled = value;
-  $('run-label').textContent = value ? (activity === 'questionnaire' ? 'Leser skjema …' : 'Preutfyller …') : 'Hent data og preutfyll';
-  $('output-loading').querySelector('h3').textContent = activity === 'questionnaire' ? 'Leser skjema …' : 'Henter data fra FHIR …';
+  // Lokal input krever ingen konfigurasjon eller kontakt med en FHIR-kilde.
+  for (const id of ['format', 'questionnaire', 'upload', 'file', 'patient']) $(id).disabled = value;
+  const activityLabel = activity === 'questionnaire' ? 'Leser skjema …' : 'Preutfyller …';
+  $('run-label').textContent = value ? activityLabel : 'Hent data og preutfyll';
+  $('output-loading').querySelector('h3').textContent = activity === 'populate' ? 'Henter data fra FHIR …' : activityLabel;
   $('output-loading').querySelector('p').textContent = activity === 'questionnaire'
     ? 'Venter på at Questionnaire er ferdig lastet.' : 'Leser Patient, kjører søk fra Q og bygger QR.';
   $('output-loading').hidden = !value;
@@ -47,7 +49,12 @@ function setBusy(value, activity = 'populate') {
 /** Vis valgt profils endepunkter og sentrale pasientinput uten å erstatte skjemaet. */
 function renderSource() {
   const source = selectedSource();
-  const identifier = usesIdentifier(), testList = usesTestList();
+  if (renderedPatientSource) patientInputs.set(renderedPatientSource, $('patient').value);
+  const patientSource = source?.patientSource;
+  const saved = patientInputs.get(patientSource);
+  if (saved !== undefined) $('patient').value = saved;
+  else if (renderedPatientSource) $('patient').value = source?.testPatientIdentifiers?.[0] || (patientSource === 'demo' ? config.defaultPatientId : '');
+  renderedPatientSource = patientSource;
   endpointChecks.forEach(check => check.destroy()); endpointChecks = [];
   $('endpoint').replaceChildren();
   for (const endpoint of source?.endpoints || []) {
@@ -59,20 +66,21 @@ function renderSource() {
     row.append(identity, status);
     $('endpoint').append(row);
   }
-  $('patient').hidden = testList;
-  $('patient').maxLength = identifier ? 256 : 64;
-  $('test-patient').hidden = !testList;
-  $('patient-label').textContent = testList ? 'Syntetisk testperson' : identifier ? 'Pasientidentifikator' : 'Patient-ID';
-  $('patient-label').htmlFor = testList ? 'test-patient' : 'patient';
-  $('patient-help').textContent = testList
-    ? 'Bare godkjente syntetiske testpersoner. Pasienten hentes fra profilens sentrale kilde når du preutfyller.'
-    : identifier ? 'Identifikator for oppslag i profilens sentrale pasientkilde.' : 'Logisk ressurs-ID i den sentrale pasientkilden, for eksempel demo-patient.';
   $('test-patient').replaceChildren();
   for (const [index, identifier] of (source?.testPatientIdentifiers || []).entries()) {
     const option = element('option', '', `Testperson ${index + 1} · ${identifier}`);
     option.value = identifier;
     $('test-patient').append(option);
   }
+  renderPatientInput();
+}
+function renderPatientInput() {
+  const identifier = usesIdentifier();
+  $('patient').maxLength = identifier ? 256 : 64;
+  $('patient-label').textContent = identifier ? 'Testpersonens fødselsnummer / identifikator' : 'Testpersonens Patient-ID';
+  $('patient-help').textContent = (identifier
+    ? 'Skriv inn testpersonens fødselsnummer eller identifikator.'
+    : 'Skriv inn logisk Patient-ID, for eksempel demo-patient.') + ' Lagres ikke i konfigurasjonen.';
 }
 /** Velg profilen fra eksakt Questionnaire-URL og versjon. Serveren håndhever samme kobling. */
 function syncQuestionnaireProfile(questionnaire) {
@@ -207,8 +215,7 @@ async function populate() {
     syncQuestionnaireProfile(questionnaire);
     if (profileError) throw new Error(profileError);
     if (usesIdentifier()) {
-      if (!patientKey() || (usesTestList() && !selectedSource().testPatientIdentifiers.includes(patientKey())))
-        throw new Error('Velg en gyldig pasientidentifikator for den sentrale kilden.');
+      if (!patientKey()) throw new Error('Skriv inn testpersonens fødselsnummer eller identifikator.');
     } else if (!/^[A-Za-z0-9.-]{1,64}$/.test(patientKey())) throw new Error('Skriv inn en gyldig logisk Patient-ID.');
   } catch (error) {
     message(error instanceof SyntaxError ? 'Ugyldig JSON. Kontroller komma, anførselstegn og parenteser i Questionnaire.' : error.message, true);
@@ -254,10 +261,17 @@ function download(value, name) {
 // Brukerhandlinger: inputendringer ugyldiggjør resultatet; bare preutfyllingshandlingen henter FHIR-data.
 $('populate').addEventListener('click', populate);
 $('source').addEventListener('change', () => updateSource());
-$('patient').addEventListener('input', invalidate);
-$('test-patient').addEventListener('change', invalidate);
+$('patient').addEventListener('input', () => { invalidate(); renderPatientInput(); });
 $('questionnaire').addEventListener('input', () => { invalidate(); $('example').value = 'custom'; updateInfo(); });
-$('example').addEventListener('change', () => loadExample($('example').value));
+$('example').addEventListener('change', () => {
+  if ($('example').value === 'custom') {
+    invalidate();
+    message('Last opp en JSON-fil eller lim inn ditt eget FHIR Questionnaire i feltet.');
+    $('questionnaire').focus();
+    return;
+  }
+  loadExample($('example').value);
+});
 $('format').addEventListener('click', () => {
   try { $('questionnaire').value = pretty(JSON.parse($('questionnaire').value)); updateInfo(); message(''); }
   catch { message('JSON kunne ikke formateres. Kontroller syntaksen.', true); }
@@ -265,7 +279,7 @@ $('format').addEventListener('click', () => {
 $('upload').addEventListener('click', () => $('file').click());
 $('file').addEventListener('change', async () => {
   const file = $('file').files[0]; if (!file) return;
-  if (busy || initializing || !config) { $('file').value = ''; return; }
+  if (busy) { $('file').value = ''; return; }
   // Lås før første await; ellers kan preutfylling starte med det forrige skjemaet.
   invalidate(); setBusy(true, 'questionnaire');
   const revision = inputRevision;
@@ -306,12 +320,18 @@ document.addEventListener('keydown', event => {
     for (const source of config.profiles) {
       const option = element('option', '', source.name); option.value = source.id; $('source').append(option);
     }
-    $('patient').value = config.defaultPatientId;
-    await updateSource();
+    // Konfigurasjonen kan komme mens brukeren skriver eller leser en lokal fil.
+    // Behold input og la en pågående fil-lesing eie busy-tilstanden.
+    renderSource();
+    if ($('example').value !== 'custom' && !busy) {
+      $('example').value = selectedSource()?.defaultExample || 'pregnancy';
+      await loadExample($('example').value);
+    }
+    updateInfo();
   } catch (error) { config = undefined; message('Kunne ikke starte appen: ' + error.message, true); }
   finally {
     initializing = false;
     // Aktiver også handlingene når brukeren allerede har limt inn eget Q.
-    setBusy(false);
+    if (!busy) setBusy(false);
   }
 })();
