@@ -356,7 +356,8 @@ def main():
             if args.browser:
                 DhgMock.mode = 'normal'
                 browser_env = dict(env, FHIR_TEST_BASE_URL=base, FHIR_TEST_DHG_MOCK='true')
-                for script in ('browser-smoke.py', 'browser-state-tests.py', 'browser-manual-input-tests.py', 'browser-configuration-tests.py'):
+                for script in ('browser-smoke.py', 'browser-state-tests.py', 'browser-patient-startup-tests.py',
+                               'browser-manual-input-tests.py', 'browser-configuration-tests.py'):
                     subprocess.run([sys.executable, '-X', 'utf8', str(ROOT / 'verification' / script)],
                                    cwd=ROOT, env=browser_env, check=True, timeout=120)
         finally:

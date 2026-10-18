@@ -8,6 +8,7 @@ let config, envelope, qr, busy = false, initializing = true, inputRevision = 0;
 let profileLocked = false, profileError = '';
 let endpointChecks = [];
 let renderedPatientSource;
+let patientInputEdited = false;
 const patientInputs = new Map();
 const flatten = items => (items || []).flatMap(item => [item, ...flatten(item.item)]);
 const pretty = value => JSON.stringify(value, null, 2);
@@ -53,7 +54,8 @@ function renderSource() {
   const patientSource = source?.patientSource;
   const saved = patientInputs.get(patientSource);
   if (saved !== undefined) $('patient').value = saved;
-  else if (renderedPatientSource) $('patient').value = source?.testPatientIdentifiers?.[0] || (patientSource === 'demo' ? config.defaultPatientId : '');
+  // Initialiser også første profil, men behold tidlig brukerinput (inkludert et tømt felt).
+  else if (renderedPatientSource || !patientInputEdited) $('patient').value = source?.testPatientIdentifiers?.[0] || (patientSource === 'demo' ? config.defaultPatientId : '');
   renderedPatientSource = patientSource;
   endpointChecks.forEach(check => check.destroy()); endpointChecks = [];
   $('endpoint').replaceChildren();
@@ -261,7 +263,7 @@ function download(value, name) {
 // Brukerhandlinger: inputendringer ugyldiggjør resultatet; bare preutfyllingshandlingen henter FHIR-data.
 $('populate').addEventListener('click', populate);
 $('source').addEventListener('change', () => updateSource());
-$('patient').addEventListener('input', () => { invalidate(); renderPatientInput(); });
+$('patient').addEventListener('input', () => { patientInputEdited = true; invalidate(); renderPatientInput(); });
 $('questionnaire').addEventListener('input', () => { invalidate(); $('example').value = 'custom'; updateInfo(); });
 $('example').addEventListener('change', () => {
   if ($('example').value === 'custom') {
