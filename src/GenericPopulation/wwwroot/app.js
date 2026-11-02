@@ -11,6 +11,9 @@ let renderedPatientSource;
 let patientInputEdited = false;
 const patientInputs = new Map();
 const flatten = items => (items || []).flatMap(item => [item, ...flatten(item.item)]);
+const flattenResponse = items => (items || []).flatMap(item => [item, ...flattenResponse(item.item), ...(item.answer || []).flatMap(a => flattenResponse(a.item))]);
+const isHidden = item => item?.extension?.some(e => e.url === 'http://hl7.org/fhir/StructureDefinition/questionnaire-hidden' && e.valueBoolean === true);
+const visibleQuestions = items => (items || []).filter(i => !isHidden(i)).flatMap(i => [...(!['group', 'display'].includes(i.type) ? [i] : []), ...visibleQuestions(i.item)]);
 const pretty = value => JSON.stringify(value, null, 2);
 const selectedSource = () => config?.profiles.find(s => s.id === $('source').value);
 // Den sentrale pasientkildens konfigurasjon avgjør input; rutingen skjer på serveren.
@@ -116,7 +119,7 @@ async function updateSource(loadDefaultExample = true) {
 function updateInfo() {
   try {
     const q = JSON.parse($('questionnaire').value);
-    const questions = flatten(q.item).filter(i => !['group', 'display'].includes(i.type));
+    const questions = visibleQuestions(q.item);
     $('q-info').textContent = `${questions.length} spørsmål · versjon ${q.version || 'mangler'}`;
     syncQuestionnaireProfile(q);
   } catch {
@@ -162,6 +165,7 @@ function answerText(answer) {
   const value = answer[key];
   if (key === 'valueQuantity') return `${value.value} ${value.unit || value.code || ''}`.trim();
   if (key === 'valueBoolean') return value ? 'Ja (true)' : 'Nei (false)';
+  if (key === 'valueCoding') return value.display || value.code || '—';
   if (value !== null && typeof value === 'object') return pretty(value);
   return value == null ? '—' : String(value);
 }
@@ -169,7 +173,8 @@ function answerText(answer) {
 function renderItems(items, parent, questionMap) {
   for (const item of items || []) {
     const question = questionMap.get(item.linkId);
-    if (question?.type === 'group' || item.item) {
+    if (isHidden(question)) continue;
+    if (question?.type === 'group') {
       parent.append(element('h3', 'group-title', item.text || item.linkId));
       renderItems(item.item, parent, questionMap);
     } else {
@@ -179,14 +184,16 @@ function renderItems(items, parent, questionMap) {
       const hasAnswer = !!item.answer?.length;
       row.append(label, element('div', 'answer-value' + (hasAnswer ? '' : ' missing'), hasAnswer ? item.answer.map(answerText).join('\n') : 'Ikke utfylt'));
       parent.append(row);
+      for (const answer of item.answer || []) renderItems(answer.item, parent, questionMap);
     }
   }
 }
 /** Vis svaret som lesbare felt, original QR JSON og separate merknader fra OperationOutcome. */
 function showResult(questionnaire, elapsed, requestCount) {
   const issues = envelope.parameter.find(p => p.name === 'issues')?.resource?.issue || [];
-  const questions = flatten(questionnaire.item).filter(i => !['group', 'display'].includes(i.type));
-  const answers = flatten(qr.item).filter(i => i.answer?.length);
+  const questions = visibleQuestions(questionnaire.item);
+  const visibleIds = new Set(questions.map(i => i.linkId));
+  const answers = flattenResponse(qr.item).filter(i => i.answer?.length && visibleIds.has(i.linkId));
   $('answered').textContent = `${answers.length}/${questions.length}`;
   $('requests').textContent = requestCount || '—';
   $('duration').textContent = elapsed < 1000 ? `${Math.round(elapsed)} ms` : `${(elapsed / 1000).toFixed(1)} s`;
@@ -286,7 +293,7 @@ $('file').addEventListener('change', async () => {
   invalidate(); setBusy(true, 'questionnaire');
   const revision = inputRevision;
   try {
-    if (file.size > 240 * 1024) throw new Error('Q-filen kan ikke være større enn 240 KiB.');
+    if (file.size > 480 * 1024) throw new Error('Q-filen kan ikke være større enn 480 KiB.');
     const data = JSON.parse(await file.text());
     if (revision !== inputRevision) return;
     if (data.resourceType !== 'Questionnaire') throw new Error('Filen må inneholde et FHIR Questionnaire.');

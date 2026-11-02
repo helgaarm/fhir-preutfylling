@@ -39,14 +39,21 @@ public sealed class PopulationEngine(IFhirDataSource source)
         }
         var scope = new Dictionary<string, Base[]>
         {
-            ["patient"] = [(Patient)context.Patient.DeepCopy()]
+            ["patient"] = [(Patient)context.Patient.DeepCopy()],
+            ["questionnaire"] = [q], ["context"] = [qr]
         };
         // Like søk gjenbrukes bare innen denne kjøringen. Del aldri denne cachen mellom
         // pasienter, virksomheter eller tilgangskontekster.
         var cache = new Dictionary<string, Bundle>(StringComparer.Ordinal);
         var origin = new QueryOrigin(q.Url!, q.Version!, null, "");
         scope = await BindAsync(q.Extension, qr, scope, context, cache, outcome, origin, cancellationToken);
-        qr.Item = await PopulateItemsAsync(q.Item, scope, context, cache, outcome, origin, cancellationToken);
+        var proposals = await PopulateItemsAsync(q, q.Item, scope, context, cache, outcome, origin, cancellationToken);
+        IEnumerable<QuestionnaireResponse.ItemComponent> Flat(IEnumerable<QuestionnaireResponse.ItemComponent> items) =>
+            items.SelectMany(i => new[] { i }.Concat(Flat(i.Item)));
+        qr.Item = QuestionnaireFeatures.BuildResponse(q, Flat(proposals).ToDictionary(i => i.LinkId!));
+        if (q.Extension.Concat(QuestionnaireFeatures.Flat(q.Item).SelectMany(i => i.Extension)).Any(e =>
+            e.Url?.Contains("sdf-fhirpath") == true || e.Url?.Contains("sdf-calculatedExpression") == true || e.Url == "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-itemExtractionContext"))
+            Warn(outcome, null, "Helsenorge-preutfylling, beregninger og ekstraksjonsmetadata er bevart i Q, men kjøres ikke av denne SDC-testmotoren. Resultatet er en preutfyllingstest, ikke en full Helsenorge-skjemakjøring.");
         outcome.Issue.AddRange(source.Issues.Select(i => (OperationOutcome.IssueComponent)i.DeepCopy()));
         if (outcome.Issue.Count == 0)
             outcome.Issue.Add(new OperationOutcome.IssueComponent
@@ -106,6 +113,7 @@ public sealed class PopulationEngine(IFhirDataSource source)
     // Går gjennom skjemaets tre og bevarer linkId for koblingen mellom spørsmål og svar.
     // Tvetydige enkeltverdier og feil datatype gir tomt felt med merknad; andre feil avbryter.
     private async Task<List<QuestionnaireResponse.ItemComponent>> PopulateItemsAsync(
+        Questionnaire q,
         IEnumerable<Questionnaire.ItemComponent> questions, Dictionary<string, Base[]> parent,
         PopulationContext context, Dictionary<string, Bundle> cache,
         OperationOutcome outcome, QueryOrigin origin, CancellationToken ct)
@@ -119,11 +127,12 @@ public sealed class PopulationEngine(IFhirDataSource source)
             {
                 LinkId = question.LinkId, Text = question.Text, Definition = question.Definition
             };
-            var scope = await BindAsync(question.Extension, item, parent, context, cache, outcome,
+            var itemScope = new Dictionary<string, Base[]>(parent) { ["qitem"] = [question], ["context"] = [item] };
+            var scope = await BindAsync(question.Extension, item, itemScope, context, cache, outcome,
                 origin with { LinkId = question.LinkId }, ct);
             if (question.Type == QType.Group)
             {
-                item.Item = await PopulateItemsAsync(question.Item, scope, context, cache, outcome, origin, ct);
+                item.Item = await PopulateItemsAsync(q, question.Item, scope, context, cache, outcome, origin, ct);
             }
             else
             {
@@ -139,14 +148,18 @@ public sealed class PopulationEngine(IFhirDataSource source)
                     {
                         // Kontroller alle verdier før tildeling, så feltet aldri får en halv svarliste.
                         var mapped = values.Select(v => AnswerMapper.Map(question.Type, v)).ToArray();
+                        if (mapped.Any(v => !QuestionnaireFeatures.IsAllowed(q, question, v)))
+                            throw new PopulationException("answer-type", "Svaret finnes ikke i spørsmålets verdiliste.");
                         item.Answer = mapped.Select(v =>
                             new QuestionnaireResponse.AnswerComponent { Value = v }).ToList();
                     }
                     catch (PopulationException e) when (e.Code == "answer-type")
                     {
-                        Warn(outcome, question.LinkId, "Kildeverdien har feil datatype eller enhet. Feltet er ikke preutfylt.");
+                        Warn(outcome, question.LinkId, "Kildeverdien har feil datatype, enhet eller svarkode. Feltet er ikke preutfylt.");
                     }
                 }
+                // Temporary proposal tree; BuildResponse places children under answer.item.
+                item.Item = await PopulateItemsAsync(q, question.Item, scope, context, cache, outcome, origin, ct);
             }
             items.Add(item);
         }

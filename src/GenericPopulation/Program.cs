@@ -32,7 +32,7 @@ var port = builder.Configuration.GetValue("Demo:Port", 5077);
 // Loopback-begrensningen gjelder utviklerappen; klinisk drift krever en egen tilgangsgrense.
 var address = $"http://127.0.0.1:{port}";
 builder.WebHost.UseUrls(address);
-builder.WebHost.ConfigureKestrel(options => options.Limits.MaxRequestBodySize = 256 * 1024);
+builder.WebHost.ConfigureKestrel(options => options.Limits.MaxRequestBodySize = 512 * 1024);
 // Unngå standardlogging av kliniske data, søkestrenger og token i denne testverten.
 builder.Logging.ClearProviders();
 if (builder.Configuration.GetSection("Fhir:Sources").GetChildren().Any(s => s["Mode"] is not null))

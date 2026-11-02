@@ -9,19 +9,27 @@ public static class AnswerMapper
     /// <summary>
     /// Returnerer en kopi ved støttet typekombinasjon; ellers kastes answer-type.
     /// Bevarer false, tallet 0 og enheter. Quantity krever system og kode, uten comparator.
-    /// Beregnede FHIRPath-systemverdier trenger en eksplisitt adapter før de kan bli FHIR-svar.
+    /// Beregnede FHIRPath Boolean/String/Integer/Date får tilsvarende FHIR-type.
     /// </summary>
     public static DataType Map(QType? questionType, Base value)
     {
+        // Firelys interne FHIRPath-primitiver leses via offentlig TypeName/JsonValue.
+        // Krev både riktig systemtype og CLR-type; tekst som "true" er ikke en boolsk verdi.
         DataType? answer = (questionType, value) switch
         {
             (QType.Boolean, FhirBoolean { Value: not null } v) => v,
+            (QType.Boolean, PrimitiveType { TypeName: "System.Boolean", JsonValue: bool v }) => new FhirBoolean(v),
             (QType.Integer, Integer { Value: not null } v) => v,
+            (QType.Integer, PrimitiveType { TypeName: "System.Integer", JsonValue: int v }) => new Integer(v),
             (QType.Decimal, FhirDecimal { Value: not null } v) => v,
             (QType.Date, Date { Value: not null } v) => v,
+            (QType.Date, PrimitiveType { TypeName: "System.Date" } v) => new Date(v.ToString()),
             (QType.DateTime, FhirDateTime { Value: not null } v) => v,
             (QType.Time, Time { Value: not null } v) => v,
             (QType.String or QType.Text, FhirString { Value: not null } v) => v,
+            (QType.String or QType.Text, PrimitiveType { TypeName: "System.String", JsonValue: string v }) => new FhirString(v),
+            (QType.Choice or QType.OpenChoice, Coding { Code: not null } v) => v,
+            (QType.OpenChoice, FhirString { Value: not null } v) => v,
             (QType.Url, FhirUri { Value: not null } v) => v,
             (QType.Quantity, Quantity { Value: not null, Comparator: null } v)
                 when !string.IsNullOrWhiteSpace(v.System) &&

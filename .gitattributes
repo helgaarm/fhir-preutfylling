@@ -1,3 +1,5 @@
 # Behold original ordlyd og mellomrom i tredjepartenes juridiske tekster.
 # Normaliser linjeskift for portable sjekksummer; ikke bruk whitespace-retting på disse filene.
 LICENSES/*.txt text eol=lf -whitespace
+# Keep delivered questionnaire hashes stable across Windows and Linux checkouts.
+questionnaires/*.json text eol=lf

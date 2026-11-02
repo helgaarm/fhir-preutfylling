@@ -89,6 +89,18 @@ status, data, _ = call('/api/populate', body, {'Origin': 'https://unrelated.exam
 check(status == 403, 'Cross-origin POST blocked')
 status, data, _ = call('/api/populate', body, {'Content-Type': 'text/plain'})
 check(status == 415, 'Non-JSON input blocked')
-status, data, _ = call('/api/populate', raw=json.dumps({**body, 'padding': 'x' * 270000}).encode())
+large_q = copy.deepcopy(q)
+large_q['description'] = 'x' * 270000
+status, data, _ = call('/api/populate', {**body, 'questionnaire': large_q})
+check(status == 200 and data['resourceType'] == 'Parameters', 'Questionnaire larger than previous 256 KiB limit accepted')
+large_q.pop('description')
+large_q['item'] = [{'linkId': f'field-{i}', 'type': 'string'} for i in range(500)]
+status, data, _ = call('/api/populate', {**body, 'questionnaire': large_q})
+check(status == 200 and len(next(p['resource'] for p in data['parameter'] if p['name'] == 'response')['item']) == 500,
+      '500 questionnaire elements accepted')
+large_q['item'].append({'linkId': 'field-500', 'type': 'string'})
+status, data, _ = call('/api/populate', {**body, 'questionnaire': large_q})
+check(status == 422 and data['resourceType'] == 'OperationOutcome', '501 questionnaire elements rejected')
+status, data, _ = call('/api/populate', raw=json.dumps({**body, 'padding': 'x' * (512 * 1024)}).encode())
 check(status == 413, 'Request size limit')
 print(f'{COUNT}/{COUNT} HTTP checks passed.')

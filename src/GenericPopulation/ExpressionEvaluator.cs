@@ -20,7 +20,7 @@ public sealed class ExpressionEvaluator
         if (string.IsNullOrWhiteSpace(text) || text.Length > 4000 || !text.StartsWith('%'))
             throw new PopulationException("expression-policy", "Uttrykket faller utenfor demoens uttrykksprofil.");
         if (Regex.IsMatch(text, @"\b(resolve|trace)\s*\(", RegexOptions.IgnoreCase) ||
-            Regex.IsMatch(text, @"%(context|resource|rootResource|questionnaire|qitem)\b"))
+            Regex.IsMatch(text, @"%(resource|rootResource)\b"))
             throw new PopulationException("expression-policy", "Uttrykket bruker en ustøttet kontekst eller funksjon.");
     }
 

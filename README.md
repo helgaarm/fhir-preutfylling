@@ -34,6 +34,8 @@ Nettleseren laster svangerskapseksemplet som standard. Du kan bytte til personop
 
 Velg **Eget skjema** for å arbeide med egen JSON, eller trykk **Last opp JSON** direkte. Opplasting og redigering virker også mens serverkonfigurasjonen lastes eller hvis lastingen feiler; preutfylling krever at konfigurasjonen er tilgjengelig. Et eget skjema beholdes ved profilbytte.
 
+[Kartlegging før første konsultasjon med Gravid-preutfylling](questionnaires/README.md) ligger som egen testfil i `questionnaires/`. Den bevarer originalens 220 elementer og metadata, med tre dokumenterte flervalgsrettelser. Last opp filen i appen; se skjemadokumentasjonen for regler, opprinnelse og begrensninger.
+
 Skriv testpersonens **Patient-ID** eller **fødselsnummer / identifikator** direkte i feltet på forsiden, og trykk **Hent data og preutfyll**. Du trenger ikke registrere personen eller endre konfigurasjonen. Eventuelle konfigurerte testpersoner vises som valgfrie forslag; andre identifikatorer kan skrives inn med samme formatkontroll. Testpersonen må allerede finnes i FHIR-kilden. Manuell input lagres bare i sidens minne, ikke i konfigurasjonen eller nettleserlagring.
 
 Den lokale FHIR-kilden eksponerer:
@@ -164,11 +166,14 @@ $r | ConvertTo-Json -Depth 100
 | Ressurser | Sentral Patient read/search; pasientrelaterte R4-ressurser med konfigurert referansesti (standard `subject`) |
 | Søkeparametere | Obligatorisk logisk `patient`; øvrige parametere og API-begrensninger styres per kilde, innen klientens pasientavgrensede søkekontrakt |
 | Initialverdier | `text/fhirpath` via SDC `initialExpression`, eller statisk `initial.value[x]` |
-| Svar | boolean, integer, decimal, date, dateTime, time, string/text, uri, Quantity |
-| Struktur | Ikke-gjentatte grupper og gjentatte spørsmål; display-items utelates fra QR |
+| Svar | boolean, integer, decimal, date, dateTime, time, string/text, uri, Quantity, Coding for choice/open-choice |
+| Beregnede FHIRPath-svar | Eksplisitte adaptere for `System.Boolean`, `System.String`, `System.Integer` og `System.Date`; ingen automatisk konvertering mellom tekst, boolske verdier og tall |
+| Valg | Opprinnelige answerOption eller lokale, inneholdte ValueSet med eksplisitte koder; svarkoden kontrolleres mot listen |
+| Struktur | Grupper, én initial instans av gjentatt gruppe, gjentatte spørsmål og underspørsmål i answer.item; display-items utelates fra QR |
+| Visningsvilkår | enableWhen med =, != og exists, any/all og referanser til andre spørsmål; deaktiverte grener utelates fra QR |
 | Quantity | Verdi, system og kode kreves; comparator støttes ikke; enhet beholdes |
 
-Det er **ikke** støtte for choice/open-choice, Reference, Attachment, gjentatte grupper, `answer.item`, CQL, `enableWhen`, `calculatedExpression`, `itemPopulationContext` eller dynamiske valgsett. Ukjente extensions avvises. `resolve()` og `trace()` er sperret. FHIRPath-systemverdier støttes bare når de kan representeres av motorens eksplisitte svaradapter; dette er ikke full SDC-konformitet eller full profil-/terminologivalidering.
+Originale metadata, verdilister, spørsmål og struktur kan beholdes når Gravid-regler legges til. SDC-uttrykk får `%questionnaire`, `%qitem` og `%context` fra motoren. Gjenkjente presentasjons- og ekstraksjonsutvidelser bevares uten at testmotoren utfører disse funksjonene. Eksisterende Helsenorge-preutfylling, beregninger og ekstraksjon kjøres ikke, og gir en synlig merknad i resultatet. Det er fortsatt ikke støtte for Reference, Attachment, CQL, calculatedExpression, itemPopulationContext eller dynamiske/eksterne valgsett. Ukjente extensions og modifierExtensions avvises. `resolve()` og `trace()` er sperret. Dette er en preutfyllingsvisning, ikke en full Helsenorge-skjemaklient, full SDC-konformitet eller profil-/terminologivalidering.
 
 Eksemplenes kliniske koder og utvalgsregler ligger i Q, ikke i motoren. Flere likeverdige treff for et ikke-gjentatt spørsmål gir et tomt felt og en merknad. `false` og `0` beholdes. Feil pasient eller kritisk HTTP-feil stopper hele preutfyllingen. Eksisterende QR aksepteres ikke som input.
 
@@ -260,7 +265,7 @@ Publisert app kjøres fra `publish` slik at appsettings og wwwroot blir funnet. 
 
 Dette er en lokal utviklerapp for **syntetiske/testdata og betrodde Q-definisjoner**. Den har ingen brukerinnlogging eller klinisk tilgangskontroll; Patient-ID er testkontekst. Den lytter på loopback, blokkerer kryssopprinnelses-POST, har ingen CORS-åpning, bruker `no-store`, logger ikke FHIR-data, følger ikke HTTP-redirects og begrenser kildekall til konfigurerte baser. Nettleseren bruker ikke localStorage. FHIRPath-kontrollene er ikke en sandbox for ondsinnede programmer; HTTP-tidsavbrudd avbryter heller ikke et allerede kjørende synkront FHIRPath-uttrykk.
 
-Grenser: 256 KiB API-request, 240 KiB opplastet Q, 200 items, 12 gruppenivåer, 4 000 tegn per FHIRPath, 20 sider per søk, 2 000 ressurser per søk og 2 MiB per kilderespons. HTTP-kall har 20 sekunders tidsgrense inkludert lesing av hele svarkroppen, og en operasjon har 60 sekunders kanselleringsfrist.
+Grenser: 512 KiB API-request, 480 KiB opplastet Q, 500 items, 12 gruppenivåer, 4 000 tegn per FHIRPath, 20 sider per søk, 2 000 ressurser per søk og 2 MiB per kilderespons. HTTP-kall har 20 sekunders tidsgrense inkludert lesing av hele svarkroppen, og en operasjon har 60 sekunders kanselleringsfrist.
 
 Bygg, selvtester, HTTP- og nettleserflyt er kontrollert. DHG Test er også verifisert med én preutfylling for hver av de to dokumenterte syntetiske testpersonene. Se **verification/RESULTATER.md**. Autentisert klinisk FHIR-tilgang er ikke verifisert; tilkobling til andre servere og deres tilgangsmodell må testes separat. Demoen er ikke produksjonsklar og skriver ikke tilbake til FHIR-kilden.
 
