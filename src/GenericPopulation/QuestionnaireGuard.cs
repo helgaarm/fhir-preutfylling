@@ -12,7 +12,7 @@ public static class QuestionnaireGuard
 {
     private static readonly HashSet<QType> Supported =
     [QType.Group, QType.Display, QType.Boolean, QType.Integer, QType.Decimal,
-     QType.Date, QType.DateTime, QType.Time, QType.String, QType.Text, QType.Url, QType.Quantity];
+     QType.Date, QType.DateTime, QType.Time, QType.String, QType.Text, QType.Url, QType.Quantity, QType.Choice, QType.OpenChoice];
 
     /// <summary>Kontrollerer versjon, pasientkontekst, struktur og uttrykk før Q behandles.</summary>
     public static void Validate(Questionnaire q)
@@ -31,6 +31,17 @@ public static class QuestionnaireGuard
             throw new PopulationException("launch-context", "Demoen krever én launchContext med navn patient og type Patient.");
         var ids = new HashSet<string>();
         Visit(q.Item, ids, 0);
+        foreach (var item in QuestionnaireFeatures.Flat(q.Item))
+        {
+            if (item.AnswerValueSet != null) _ = QuestionnaireFeatures.Options(q, item);
+            if (item.EnableWhen.Count > 1 && item.EnableBehavior is null)
+                throw new PopulationException("enablewhen", "Flere visningsvilkår krever enableBehavior.");
+            foreach (var condition in item.EnableWhen)
+                if (condition.Question is null || !ids.Contains(condition.Question) || condition.Question == item.LinkId ||
+                    condition.Operator is not (Questionnaire.QuestionnaireItemOperator.Equal or Questionnaire.QuestionnaireItemOperator.NotEqual or Questionnaire.QuestionnaireItemOperator.Exists) ||
+                    condition.Answer is null || condition.Operator == Questionnaire.QuestionnaireItemOperator.Exists && condition.Answer is not FhirBoolean { Value: not null })
+                    throw new PopulationException("enablewhen", "Ustøttet eller ugyldig visningsvilkår.");
+        }
     }
 
     // Felles ID-sett for hele treet sikrer entydig kobling til QR; grenser på dybde og antall
@@ -40,15 +51,11 @@ public static class QuestionnaireGuard
         if (depth > 12) throw new PopulationException("questionnaire-size", "For dypt Q-hierarki.");
         foreach (var item in items)
         {
-            if (string.IsNullOrWhiteSpace(item.LinkId) || !ids.Add(item.LinkId) || ids.Count > 200)
+            if (string.IsNullOrWhiteSpace(item.LinkId) || !ids.Add(item.LinkId) || ids.Count > 500)
                 throw new PopulationException("linkid", "Q har ugyldige eller dupliserte linkId-er.");
             if (item.Type is null || !Supported.Contains(item.Type.Value) ||
-                item.ModifierExtension.Count != 0 || item.EnableWhen.Count != 0 ||
-                item.AnswerOption.Count != 0 || item.AnswerValueSet is not null)
+                item.ModifierExtension.Count != 0 || item.AnswerOption.Count != 0 && item.AnswerValueSet is not null)
                 throw new PopulationException("unsupported-feature", "Q bruker funksjoner utenfor demoens støttede profil.");
-            if ((item.Type == QType.Group && item.Repeats == true) ||
-                (item.Type != QType.Group && item.Item.Count != 0))
-                throw new PopulationException("unsupported-structure", "Gjentatte grupper og underspørsmål under svar støttes ikke i demoen.");
             CheckExtensions(item.Extension, false);
             var initial = item.Extension.Where(e => e.Url == Sdc.Initial).ToArray();
             if (initial.Length > 1 || (initial.Length != 0 && item.Initial.Count != 0) ||
@@ -67,6 +74,7 @@ public static class QuestionnaireGuard
         foreach (var ext in extensions)
         {
             if (root && ext.Url == Sdc.Launch) continue;
+            if (ext.Url != null && QuestionnaireFeatures.PreservedExtensions.Contains(ext.Url)) continue;
             if (ext.Url != Sdc.Variable && (root || ext.Url != Sdc.Initial))
                 throw new PopulationException("unsupported-extension", "Q inneholder en extension demoen ikke støtter.");
             if (ext.Value is not Expression expression || string.IsNullOrWhiteSpace(expression.Expression_) ||

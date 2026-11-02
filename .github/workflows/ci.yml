@@ -43,6 +43,8 @@ jobs:
         run: dotnet build --configuration Release --no-restore --warnaserror
       - name: Run C# regression tests
         run: dotnet run --project src/GenericPopulation --configuration Release --no-build -- --self-test
+      - name: Test full questionnaire upload and preview functions
+        run: node verification/frontend-preservation-tests.cjs questionnaires/forstekonsultasjon-gravid.json
       - name: Publish
         run: dotnet publish src/GenericPopulation --configuration Release --no-build --output publish
       - name: Verify distributed license documentation

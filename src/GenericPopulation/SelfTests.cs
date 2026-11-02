@@ -65,10 +65,75 @@ public static class SelfTests
                 var result = await new PopulationEngine(new FixtureDataSource([])).CreateAsync(q, Context());
                 Check(Find(result.Response, "birthDate").Answer.Count == 0, "no coercion");
             }),
-            ("Gjentatte grupper avvises eksplisitt", async () =>
+            ("Beregnede FHIRPath-svar bevarer Boolean, tekst og tomme resultater", async () =>
+            {
+                var q = DemoFiles.Questionnaire("general");
+                q.Item = new[]
+                {
+                    ("yes", QType.Boolean, "%patient.iif(true, true, {})"),
+                    ("no", QType.Boolean, "%patient.iif(true, false, {})"),
+                    ("label", QType.String, "%patient.iif(true, 'Nei', 'Ja')"),
+                    ("text", QType.Text, "%patient.iif(true, 'Merknad', {})"),
+                    ("missing", QType.Boolean, "%patient.iif(false, true, {})")
+                }.Select(x => new Questionnaire.ItemComponent
+                {
+                    LinkId = x.Item1, Type = x.Item2,
+                    Extension = [new Extension(Sdc.Initial, new Expression { Language = "text/fhirpath", Expression_ = x.Item3 })]
+                }).ToList();
+                var result = await new PopulationEngine(new FixtureDataSource([])).CreateAsync(q, Context());
+                Check(((FhirBoolean)Find(result.Response, "yes").Answer.Single().Value!).Value == true, "computed true");
+                Check(((FhirBoolean)Find(result.Response, "no").Answer.Single().Value!).Value == false, "computed false");
+                Check(((FhirString)Find(result.Response, "label").Answer.Single().Value!).Value == "Nei", "computed label");
+                Check(((FhirString)Find(result.Response, "text").Answer.Single().Value!).Value == "Merknad", "computed text");
+                Check(Find(result.Response, "missing").Answer.Count == 0, "empty does not become false");
+                Check(result.Outcome.Issue.All(i => i.Severity == OperationOutcome.IssueSeverity.Information), "no conversion warnings");
+                var roundtrip = new FhirJsonDeserializer().Deserialize<QuestionnaireResponse>(new FhirJsonSerializer().SerializeToString(result.Response));
+                Check(((FhirBoolean)Find(roundtrip, "no").Answer.Single().Value!).Value == false, "serialized false");
+            }),
+            ("Beregnede svar konverteres ikke mellom Boolean, tekst og tall", async () =>
+            {
+                var q = DemoFiles.Questionnaire("general");
+                q.Item = new[]
+                {
+                    ("string-as-boolean", QType.Boolean, "%patient.iif(true, 'true', {})"),
+                    ("boolean-as-string", QType.String, "%patient.iif(true, true, {})"),
+                    ("integer-as-boolean", QType.Boolean, "%patient.name.count()")
+                }.Select(x => new Questionnaire.ItemComponent
+                {
+                    LinkId = x.Item1, Type = x.Item2,
+                    Extension = [new Extension(Sdc.Initial, new Expression { Language = "text/fhirpath", Expression_ = x.Item3 })]
+                }).ToList();
+                var result = await new PopulationEngine(new FixtureDataSource([])).CreateAsync(q, Context());
+                Check(Flatten(result.Response.Item).All(i => i.Answer.Count == 0), "no cross-type coercion");
+                Check(result.Outcome.Issue.Count(i => i.Severity == OperationOutcome.IssueSeverity.Warning) == 3, "three type warnings");
+            }),
+            ("Beregnede flervalgssvar kontrolleres samlet før tildeling", async () =>
+            {
+                var q = DemoFiles.Questionnaire("general");
+                q.Item = [new Questionnaire.ItemComponent
+                {
+                    LinkId = "conditions", Type = QType.String, Repeats = true,
+                    Extension = [new Extension(Sdc.Initial, new Expression
+                    {
+                        Language = "text/fhirpath", Expression_ = "%patient.iif(true, ('Blodpropp' | 'Legemiddelallergi'), {})"
+                    })]
+                }];
+                var engine = new PopulationEngine(new FixtureDataSource([]));
+                var result = await engine.CreateAsync(q, Context());
+                Check(Find(result.Response, "conditions").Answer.Select(a => ((FhirString)a.Value!).Value)
+                    .ToHashSet().SetEquals(["Blodpropp", "Legemiddelallergi"]), "both labels retained");
+                ((Expression)q.Item[0].Extension[0].Value!).Expression_ = "%patient.iif(true, ('Blodpropp' | true), {})";
+                var invalid = await engine.CreateAsync(q, Context());
+                Check(Find(invalid.Response, "conditions").Answer.Count == 0, "mixed types produce no partial list");
+                q.Item[0].Repeats = false;
+                ((Expression)q.Item[0].Extension[0].Value!).Expression_ = "%patient.iif(true, ('Blodpropp' | 'Legemiddelallergi'), {})";
+                Check(Find((await engine.CreateAsync(q, Context())).Response, "conditions").Answer.Count == 0, "nonrepeating item cannot receive two labels");
+            }),
+            ("Gjentatt gruppe bevares med én initial instans", async () =>
             {
                 var q = DemoFiles.Questionnaire("general"); q.Item[0].Repeats = true;
-                await Error("unsupported-structure", () => new PopulationEngine(new FixtureDataSource([])).CreateAsync(q, Context()));
+                var result = await new PopulationEngine(new FixtureDataSource([])).CreateAsync(q, Context());
+                Check(result.Response.Item.Count == q.Item.Count && q.Item[0].Repeats == true, "one initial group, unchanged Q");
             }),
             ("Ukjente extensions avvises eksplisitt", async () =>
             {
@@ -236,6 +301,7 @@ public static class SelfTests
             })
         };
         cases.AddRange(FhirSourceSelfTests.Cases());
+        cases.AddRange(QuestionnaireFeaturesSelfTests.Cases());
         cases.AddRange(FhirTransportSelfTests.Cases());
         cases.AddRange(RoutingSelfTests.Cases());
         cases.AddRange(QuestionnaireRoutingSelfTests.Cases());
