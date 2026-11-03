@@ -12,7 +12,7 @@
     <WarningsAsErrors>$(WarningsAsErrors);NU1900;NU1901;NU1902;NU1903;NU1904;NU1905</WarningsAsErrors>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Hl7.Fhir.R4" Version="6.6.0" />
+    <PackageReference Include="Hl7.Fhir.R4" Version="6.8.0" />
   </ItemGroup>
   <ItemGroup>
     <!-- Lokale GUI-innstillinger skal aldri følge bygg eller publisering. -->
